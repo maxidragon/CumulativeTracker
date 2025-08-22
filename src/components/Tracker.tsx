@@ -24,7 +24,6 @@ const Tracker = ({ person, roundIds, events, limit }: TrackerProps) => {
   );
 
   useEffect(() => {
-    const temp: Attempt[] = [];
     let numberOfAttempts = 0;
   
     for (const roundId of filteredRounds) {
@@ -48,7 +47,7 @@ const Tracker = ({ person, roundIds, events, limit }: TrackerProps) => {
     }
   }, [filteredRounds, events]);
 
-    
+
   const calculateLimit = () => {
     const sumOfAttempts = currentAttempts.reduce(
       (acc, attempt) => acc + (attempt.value || 0),
