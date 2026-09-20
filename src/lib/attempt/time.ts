@@ -73,7 +73,8 @@ export function formatTime(
 
   if (
     !preserveCentiseconds &&
-    (centiseconds >= TEN_MINUTES_CENTISECONDS || (compact && hundredths === 0))
+    compact &&
+    hundredths === 0
   ) {
     return clock;
   }

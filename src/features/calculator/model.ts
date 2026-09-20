@@ -1,5 +1,5 @@
 import { attemptsForFormat, groupKey, type RoundFormat } from "../../lib/cumulative";
-import { validateAttempt, type TrackedAttempt } from "../../lib/attempt";
+import { isTrackedAttempt, type TrackedAttempt } from "../../lib/attempt";
 
 export type CalculatorRound = {
   roundId: string;
@@ -179,26 +179,12 @@ export function isCalculatorState(value: unknown): value is CalculatorState {
       .map((round) => round.roundId)
       .filter((roundId): roundId is string => typeof roundId === "string"),
   );
-  const attemptsValid = value.attempts.every((attempt) => {
-    if (
-      !isRecord(attempt) ||
-      typeof attempt.roundId !== "string" ||
-      !roundIds.has(attempt.roundId) ||
-      !Number.isInteger(attempt.attemptNumber) ||
-      (attempt.attemptNumber as number) < 1 ||
-      !["ok", "dnf", "dns", "skipped"].includes(String(attempt.outcome)) ||
-      (attempt.centiseconds !== null &&
-        (!Number.isSafeInteger(attempt.centiseconds) ||
-          (attempt.centiseconds as number) < 0)) ||
-      typeof attempt.estimated !== "boolean" ||
-      !Number.isInteger(attempt.order) ||
-      (attempt.order as number) < 1 ||
-      typeof attempt.enteredAt !== "string"
-    ) {
-      return false;
-    }
-    return validateAttempt(attempt as TrackedAttempt).length === 0;
-  });
+  const attemptsValid = value.attempts.every(
+    (attempt) =>
+      isTrackedAttempt(attempt) &&
+      roundIds.has(attempt.roundId) &&
+      attempt.order >= 1,
+  );
   if (!roundsValid || !attemptsValid) return false;
 
   const attemptKeys = value.attempts.map(

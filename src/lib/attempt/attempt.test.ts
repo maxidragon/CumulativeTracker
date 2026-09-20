@@ -64,6 +64,7 @@ describe("WCA time input", () => {
     expect(formatTime(6_421)).toBe("1:04.21");
     expect(formatTime(372_345, { preserveCentiseconds: true })).toBe("1:02:03.45");
     expect(formatTime(120_000, { compact: true })).toBe("20:00");
+    expect(formatTime(88_766, { compact: true })).toBe("14:47.66");
     expect(parseTimeInput("20:00")).toBe(120_000);
   });
 

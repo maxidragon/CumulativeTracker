@@ -76,3 +76,21 @@ export function validateAttempt(attempt: TrackedAttempt): string[] {
   }
   return errors;
 }
+
+export function isTrackedAttempt(value: unknown): value is TrackedAttempt {
+  if (typeof value !== "object" || value === null) return false;
+  const attempt = value as Record<string, unknown>;
+  if (
+    typeof attempt.roundId !== "string" ||
+    !Number.isInteger(attempt.attemptNumber) ||
+    !["ok", "dnf", "dns", "skipped"].includes(String(attempt.outcome)) ||
+    (attempt.centiseconds !== null && !Number.isSafeInteger(attempt.centiseconds)) ||
+    typeof attempt.estimated !== "boolean" ||
+    !Number.isInteger(attempt.order) ||
+    typeof attempt.enteredAt !== "string" ||
+    (attempt.auto !== undefined && typeof attempt.auto !== "boolean")
+  ) {
+    return false;
+  }
+  return validateAttempt(attempt as TrackedAttempt).length === 0;
+}

@@ -8,6 +8,26 @@ import { HomeScreen } from "../features/home/HomeScreen";
 const CalculatorScreen = lazy(async () => ({
   default: (await import("../features/calculator/CalculatorScreen")).CalculatorScreen,
 }));
+const CompetitionOverviewScreen = lazy(async () => ({
+  default: (await import("../features/competition/CompetitionOverviewScreen"))
+    .CompetitionOverviewScreen,
+}));
+const CompetitionBoardScreen = lazy(async () => ({
+  default: (await import("../features/competition/CompetitionBoardScreen"))
+    .CompetitionBoardScreen,
+}));
+const CompetitorScreen = lazy(async () => ({
+  default: (await import("../features/competition/CompetitorScreen"))
+    .CompetitorScreen,
+}));
+
+function RouteLoading({ label }: { label: string }) {
+  return (
+    <Box aria-label={label} sx={{ display: "grid", placeItems: "center", py: 10 }}>
+      <CircularProgress />
+    </Box>
+  );
+}
 
 export function AppRouter() {
   return (
@@ -19,11 +39,7 @@ export function AppRouter() {
             path="calculator"
             element={
               <Suspense
-                fallback={
-                  <Box aria-label="Loading calculator" sx={{ display: "grid", placeItems: "center", py: 10 }}>
-                    <CircularProgress />
-                  </Box>
-                }
+                fallback={<RouteLoading label="Loading calculator" />}
               >
                 <CalculatorScreen />
               </Suspense>
@@ -32,31 +48,25 @@ export function AppRouter() {
           <Route
             path="c/:competitionId"
             element={
-              <PlaceholderScreen
-                eyebrow="Competition"
-                title="Competition overview"
-                description="Public WCIF loading and cumulative group selection will live here."
-              />
+              <Suspense fallback={<RouteLoading label="Loading competition" />}>
+                <CompetitionOverviewScreen />
+              </Suspense>
             }
           />
           <Route
             path="c/:competitionId/g/:groupKey"
             element={
-              <PlaceholderScreen
-                eyebrow="Group board"
-                title="Competitor budgets"
-                description="This route will sort competitors by remaining time and sync state."
-              />
+              <Suspense fallback={<RouteLoading label="Loading group" />}>
+                <CompetitionBoardScreen />
+              </Suspense>
             }
           />
           <Route
             path="c/:competitionId/g/:groupKey/:registrantId"
             element={
-              <PlaceholderScreen
-                eyebrow="Competitor"
-                title="Attempt entry"
-                description="This route will keep the next-attempt cap above the fold."
-              />
+              <Suspense fallback={<RouteLoading label="Loading competitor" />}>
+                <CompetitorScreen />
+              </Suspense>
             }
           />
           <Route
