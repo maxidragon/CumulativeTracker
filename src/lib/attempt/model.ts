@@ -13,6 +13,10 @@ export type TrackedAttempt = {
   order: number;
   enteredAt: string;
   auto?: boolean;
+  syncStatus?: "local" | "sending" | "synced" | "failed";
+  syncError?: string;
+  remoteResult?: number;
+  changedRemotely?: boolean;
 };
 
 export function officialResult(attempt: TrackedAttempt): number {
@@ -88,7 +92,13 @@ export function isTrackedAttempt(value: unknown): value is TrackedAttempt {
     typeof attempt.estimated !== "boolean" ||
     !Number.isInteger(attempt.order) ||
     typeof attempt.enteredAt !== "string" ||
-    (attempt.auto !== undefined && typeof attempt.auto !== "boolean")
+    (attempt.auto !== undefined && typeof attempt.auto !== "boolean") ||
+    (attempt.syncStatus !== undefined &&
+      (typeof attempt.syncStatus !== "string" ||
+        !["local", "sending", "synced", "failed"].includes(attempt.syncStatus))) ||
+    (attempt.syncError !== undefined && typeof attempt.syncError !== "string") ||
+    (attempt.remoteResult !== undefined && !Number.isInteger(attempt.remoteResult)) ||
+    (attempt.changedRemotely !== undefined && typeof attempt.changedRemotely !== "boolean")
   ) {
     return false;
   }

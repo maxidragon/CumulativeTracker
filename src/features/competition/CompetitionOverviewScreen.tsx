@@ -25,6 +25,7 @@ import {
   useManagedCompetitions,
 } from "../auth/api";
 import { useAuthStore } from "../auth/store";
+import { LiveSetupCard } from "../live/LiveSetupCard";
 import { CompetitionState } from "./CompetitionState";
 import { cacheAge, useCompetitionData } from "./data";
 import { useTrackingStore } from "./trackingStore";
@@ -36,6 +37,7 @@ export function CompetitionOverviewScreen() {
   const setGroupPerAttemptLimit = useTrackingStore(
     (state) => state.setGroupPerAttemptLimit,
   );
+  const setLiveEnabled = useTrackingStore((state) => state.setLiveEnabled);
   const tracking = useTrackingStore((state) => state.competitions[competitionId]);
   const session = useAuthStore((state) => state.session);
   const currentUser = useCurrentUser();
@@ -92,6 +94,12 @@ export function CompetitionOverviewScreen() {
               scoretaking access, WCA Live may still accept your competition token.
             </Alert>
           ) : null}
+
+          <LiveSetupCard
+            competitionId={competitionId}
+            liveEnabled={tracking?.liveEnabled ?? false}
+            onLiveEnabledChange={(enabled) => setLiveEnabled(competitionId, enabled)}
+          />
 
           {groups.length === 0 ? (
             <Alert severity="info">

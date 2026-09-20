@@ -7,6 +7,7 @@ export type CompetitionTracking = {
   version: 1;
   budgets: Record<string, Budget>;
   groupSettings: Record<string, number | null>;
+  liveEnabled: boolean;
 };
 
 type TrackingStore = {
@@ -20,6 +21,15 @@ type TrackingStore = {
     attempt: TrackedAttempt,
   ) => void;
   replaceBudget: (competitionId: string, budget: Budget) => void;
+  setAttemptSync: (
+    competitionId: string,
+    groupKey: string,
+    registrantId: number,
+    roundId: string,
+    attemptNumber: number,
+    sync: Pick<TrackedAttempt, "syncStatus" | "syncError" | "remoteResult">,
+  ) => void;
+  setLiveEnabled: (competitionId: string, enabled: boolean) => void;
   setGroupPerAttemptLimit: (
     competitionId: string,
     groupKey: string,
@@ -32,7 +42,7 @@ export function trackingBudgetKey(groupKey: string, registrantId: number): strin
 }
 
 function emptyTracking(): CompetitionTracking {
-  return { version: 1, budgets: {}, groupSettings: {} };
+  return { version: 1, budgets: {}, groupSettings: {}, liveEnabled: false };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -69,7 +79,8 @@ export function isCompetitionTracking(value: unknown): value is CompetitionTrack
     !isRecord(value) ||
     value.version !== 1 ||
     !isRecord(value.budgets) ||
-    !isRecord(value.groupSettings)
+    !isRecord(value.groupSettings) ||
+    typeof value.liveEnabled !== "boolean"
   ) {
     return false;
   }
@@ -129,7 +140,13 @@ export const useTrackingStore = create<TrackingStore>((set) => ({
         attempts: budget.attempts.map((existing) =>
           existing.roundId === attempt.roundId &&
           existing.attemptNumber === attempt.attemptNumber
-            ? attempt
+            ? {
+                ...attempt,
+                syncStatus:
+                  attempt.outcome === "skipped" ? undefined : ("local" as const),
+                syncError: undefined,
+                changedRemotely: false,
+              }
             : existing,
         ),
       };
@@ -147,6 +164,40 @@ export const useTrackingStore = create<TrackingStore>((set) => ({
         ...current,
         budgets: { ...current.budgets, [key]: budget },
       });
+      return { competitions: { ...competitions, [competitionId]: tracking } };
+    }),
+  setAttemptSync: (
+    competitionId,
+    groupKey,
+    registrantId,
+    roundId,
+    attemptNumber,
+    sync,
+  ) =>
+    set(({ competitions }) => {
+      const current = competitions[competitionId];
+      if (!current) return { competitions };
+      const key = trackingBudgetKey(groupKey, registrantId);
+      const budget = current.budgets[key];
+      if (!budget) return { competitions };
+      const nextBudget = {
+        ...budget,
+        attempts: budget.attempts.map((attempt) =>
+          attempt.roundId === roundId && attempt.attemptNumber === attemptNumber
+            ? { ...attempt, ...sync }
+            : attempt,
+        ),
+      };
+      const tracking = persist(competitionId, {
+        ...current,
+        budgets: { ...current.budgets, [key]: nextBudget },
+      });
+      return { competitions: { ...competitions, [competitionId]: tracking } };
+    }),
+  setLiveEnabled: (competitionId, liveEnabled) =>
+    set(({ competitions }) => {
+      const current = competitions[competitionId] ?? emptyTracking();
+      const tracking = persist(competitionId, { ...current, liveEnabled });
       return { competitions: { ...competitions, [competitionId]: tracking } };
     }),
   setGroupPerAttemptLimit: (competitionId, groupKey, centiseconds) =>

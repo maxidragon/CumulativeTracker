@@ -8,13 +8,14 @@ import {
   Divider,
   Grid,
   IconButton,
+  Chip,
   Stack,
   Typography,
 } from "@mui/material";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ConfirmActionDialog } from "../../components/ConfirmActionDialog";
-import { formatTime, type TrackedAttempt } from "../../lib/attempt";
+import { formatTime, officialResult, type TrackedAttempt } from "../../lib/attempt";
 import {
   attemptsLeft,
   averageForRemainingAttempts,
@@ -35,6 +36,15 @@ import { CompetitionState } from "./CompetitionState";
 import { useCompetitionData } from "./data";
 import { trackingBudgetKey, useTrackingStore } from "./trackingStore";
 import { countryFlag, summaryForGroup } from "./viewModel";
+import { useAuthStore } from "../auth/store";
+import { activeLiveToken } from "../live/mode";
+import { useLiveResults, useOnlineStatus } from "../live/hooks";
+import {
+  enterLiveAttempt,
+  reconcileLiveBudget,
+  remoteResultForAttempt,
+  takeRemoteAttempt,
+} from "../../lib/wcaLive";
 
 type PendingAction = "stop" | "dns" | "clear" | null;
 
@@ -50,7 +60,12 @@ export function CompetitorScreen() {
   const ensureBudgets = useTrackingStore((state) => state.ensureBudgets);
   const updateAttempt = useTrackingStore((state) => state.updateAttempt);
   const replaceBudget = useTrackingStore((state) => state.replaceBudget);
+  const setAttemptSync = useTrackingStore((state) => state.setAttemptSync);
   const tracking = useTrackingStore((state) => state.competitions[competitionId]);
+  const session = useAuthStore((state) => state.session);
+  const liveToken = activeLiveToken(competitionId, tracking, session);
+  const online = useOnlineStatus();
+  const liveResults = useLiveResults(competitionId, liveToken !== null);
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
 
   const group = query.data
@@ -93,9 +108,131 @@ export function CompetitorScreen() {
   const ordered = budget ? orderedAttempts(budget.attempts) : [];
   const nextAttempt = ordered.find(({ outcome }) => outcome === "skipped");
 
+  useEffect(() => {
+    if (!budget || !group || !liveResults.data) return;
+    const reconciled = reconcileLiveBudget(budget, group, liveResults.data);
+    if (JSON.stringify(reconciled) !== JSON.stringify(budget)) {
+      replaceBudget(competitionId, reconciled);
+    }
+  }, [budget, competitionId, group, liveResults.data, replaceBudget]);
+
+  const currentAttempt = (target: TrackedAttempt) => {
+    if (!group) return undefined;
+    const currentTracking = useTrackingStore.getState().competitions[competitionId];
+    const currentBudget =
+      currentTracking?.budgets[trackingBudgetKey(group.key, registrantId)];
+    return currentBudget?.attempts.find(
+      (attempt) =>
+        attempt.roundId === target.roundId &&
+        attempt.attemptNumber === target.attemptNumber,
+    );
+  };
+
+  const submitAttempt = async (attempt: TrackedAttempt, submitMine = false) => {
+    if (
+      !liveToken ||
+      !group ||
+      !person ||
+      !online ||
+      attempt.outcome === "skipped" ||
+      attempt.estimated
+    ) {
+      return;
+    }
+    const round = group.rounds.find(({ roundId }) => roundId === attempt.roundId);
+    if (!round) return;
+    const sentResult = officialResult(attempt);
+
+    try {
+      const refreshed = await liveResults.refetch();
+      if (refreshed.error || !refreshed.data) {
+        throw new Error("WCA Live results could not be refreshed before submission.");
+      }
+      const remote = remoteResultForAttempt(
+        refreshed.data,
+        group,
+        person.registrantId,
+        attempt,
+      );
+      if (!submitMine && remote !== null) {
+        if (remote === sentResult) {
+          setAttemptSync(
+            competitionId,
+            group.key,
+            person.registrantId,
+            attempt.roundId,
+            attempt.attemptNumber,
+            { syncStatus: "synced", syncError: undefined, remoteResult: undefined },
+          );
+        } else {
+          setAttemptSync(
+            competitionId,
+            group.key,
+            person.registrantId,
+            attempt.roundId,
+            attempt.attemptNumber,
+            { syncStatus: "local", syncError: undefined, remoteResult: remote },
+          );
+        }
+        return;
+      }
+
+      setAttemptSync(
+        competitionId,
+        group.key,
+        person.registrantId,
+        attempt.roundId,
+        attempt.attemptNumber,
+        { syncStatus: "sending", syncError: undefined, remoteResult: attempt.remoteResult },
+      );
+      await enterLiveAttempt(liveToken.token, {
+        competitionWcaId: competitionId,
+        eventId: round.eventId,
+        roundNumber: round.roundNumber,
+        registrantId: person.registrantId,
+        attemptNumber: attempt.attemptNumber,
+        attemptResult: sentResult,
+      });
+      const latest = currentAttempt(attempt);
+      if (
+        latest &&
+        latest.enteredAt === attempt.enteredAt &&
+        officialResult(latest) === sentResult
+      ) {
+        setAttemptSync(
+          competitionId,
+          group.key,
+          person.registrantId,
+          attempt.roundId,
+          attempt.attemptNumber,
+          { syncStatus: "synced", syncError: undefined, remoteResult: undefined },
+        );
+      }
+    } catch (error) {
+      const latest = currentAttempt(attempt);
+      if (latest?.enteredAt === attempt.enteredAt) {
+        setAttemptSync(
+          competitionId,
+          group.key,
+          person.registrantId,
+          attempt.roundId,
+          attempt.attemptNumber,
+          {
+            syncStatus: "failed",
+            syncError: error instanceof Error ? error.message : "WCA Live submission failed.",
+            remoteResult: latest.remoteResult,
+          },
+        );
+      }
+    }
+  };
+
   const commitAttempt = (attempt: TrackedAttempt) => {
     if (!group || !person) return;
     updateAttempt(competitionId, group.key, person.registrantId, attempt);
+    if (liveToken && online && attempt.outcome !== "skipped" && !attempt.estimated) {
+      void submitAttempt({ ...attempt, syncStatus: "local" });
+    }
   };
 
   const confirmAction = () => {
@@ -106,20 +243,36 @@ export function CompetitorScreen() {
     if (pendingAction === "clear") {
       if (fallbackBudget) replaceBudget(competitionId, fallbackBudget);
     } else if (pendingAction === "dns" && nextAttempt) {
-      replaceBudget(competitionId, {
+      const nextBudget = {
         ...budget,
         attempts: dnsRemainingInRound(budget.attempts, nextAttempt.roundId),
-      });
+      };
+      replaceBudget(competitionId, nextBudget);
+      if (liveToken && online) {
+        for (const attempt of nextBudget.attempts) {
+          if (
+            attempt.roundId === nextAttempt.roundId &&
+            attempt.outcome === "dns" &&
+            attempt.syncStatus === "local"
+          ) {
+            void submitAttempt(attempt);
+          }
+        }
+      }
     } else if (pendingAction === "stop" && nextAttempt) {
       if (group.cumulative) {
-        replaceBudget(
-          competitionId,
-          stopAttemptAtLimit(
-            budget,
-            nextAttempt.roundId,
-            nextAttempt.attemptNumber,
-          ),
+        const nextBudget = stopAttemptAtLimit(
+          budget,
+          nextAttempt.roundId,
+          nextAttempt.attemptNumber,
         );
+        replaceBudget(competitionId, nextBudget);
+        const stopped = nextBudget.attempts.find(
+          (attempt) =>
+            attempt.roundId === nextAttempt.roundId &&
+            attempt.attemptNumber === nextAttempt.attemptNumber,
+        );
+        if (stopped && liveToken && online) void submitAttempt(stopped);
       } else {
         commitAttempt({
           ...nextAttempt,
@@ -156,6 +309,9 @@ export function CompetitorScreen() {
             <Typography color="text.secondary">
               Registrant #{person.registrantId}
             </Typography>
+            {liveToken ? (
+              <Chip color="primary" label="WCA Live mode" size="small" sx={{ mt: 1 }} />
+            ) : null}
           </Box>
 
           <Grid aria-live="polite" container spacing={2}>
@@ -217,6 +373,17 @@ export function CompetitorScreen() {
           {group.cumulative && summary.exhausted ? (
             <Alert severity="error">The cumulative limit is exhausted.</Alert>
           ) : null}
+          {liveToken && !online ? (
+            <Alert severity="info">
+              You are offline. Attempts stay local; submission is available when the connection
+              returns.
+            </Alert>
+          ) : null}
+          {liveToken && liveResults.isError ? (
+            <Alert severity="warning">
+              WCA Live results could not be refreshed. Local tracking still works.
+            </Alert>
+          ) : null}
 
           <Stack divider={<Divider flexItem />} spacing={3}>
             {ordered.map((attempt, index) => {
@@ -249,6 +416,84 @@ export function CompetitorScreen() {
                         fields.item(index + (direction === "next" ? 1 : -1))?.focus();
                       }}
                     />
+                    {liveToken && attempt.outcome !== "skipped" ? (
+                      <Stack spacing={1} sx={{ mt: 1 }}>
+                        <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                          <Chip
+                            color={
+                              attempt.syncStatus === "synced"
+                                ? "success"
+                                : attempt.syncStatus === "failed"
+                                  ? "error"
+                                  : attempt.syncStatus === "sending"
+                                    ? "primary"
+                                    : "default"
+                            }
+                            label={
+                              attempt.estimated
+                                ? "Estimate · Local only"
+                                : attempt.syncStatus === "synced"
+                                  ? "On WCA Live"
+                                  : attempt.syncStatus === "sending"
+                                    ? "Sending"
+                                    : attempt.syncStatus === "failed"
+                                      ? "Failed"
+                                      : "Local"
+                            }
+                            size="small"
+                          />
+                          {!attempt.estimated &&
+                          attempt.syncStatus !== "sending" &&
+                          attempt.syncStatus !== "synced" ? (
+                            <Button
+                              disabled={!online}
+                              onClick={() =>
+                                void submitAttempt(attempt, attempt.remoteResult !== undefined)
+                              }
+                              size="small"
+                            >
+                              {attempt.remoteResult !== undefined
+                                ? "Submit mine"
+                                : attempt.syncStatus === "failed"
+                                  ? "Retry"
+                                  : "Submit"}
+                            </Button>
+                          ) : null}
+                          {attempt.remoteResult !== undefined ? (
+                            <Button
+                              onClick={() => {
+                                const remoteResult = attempt.remoteResult;
+                                if (remoteResult === undefined) return;
+                                replaceBudget(competitionId, {
+                                  ...budget,
+                                  attempts: budget.attempts.map((current) =>
+                                    current.roundId === attempt.roundId &&
+                                    current.attemptNumber === attempt.attemptNumber
+                                      ? takeRemoteAttempt(current, remoteResult)
+                                      : current,
+                                  ),
+                                });
+                              }}
+                              size="small"
+                            >
+                              Take WCA Live
+                            </Button>
+                          ) : null}
+                        </Stack>
+                        {attempt.remoteResult !== undefined ? (
+                          <Alert severity="warning">
+                            WCA Live has {formatOfficialResult(attempt.remoteResult)} for this
+                            attempt. Choose which value to keep.
+                          </Alert>
+                        ) : null}
+                        {attempt.syncError ? (
+                          <Alert severity="error">{attempt.syncError}</Alert>
+                        ) : null}
+                        {attempt.changedRemotely ? (
+                          <Alert severity="info">This attempt was changed on WCA Live.</Alert>
+                        ) : null}
+                      </Stack>
+                    ) : null}
                   </Box>
                   {group.rounds.length > 1 ? (
                     <Stack>
@@ -351,4 +596,10 @@ export function CompetitorScreen() {
       ) : null}
     </CompetitionState>
   );
+}
+
+function formatOfficialResult(result: number): string {
+  if (result === -1) return "DNF";
+  if (result === -2) return "DNS";
+  return formatTime(result, { compact: true });
 }

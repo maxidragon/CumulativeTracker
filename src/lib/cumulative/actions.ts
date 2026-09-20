@@ -16,6 +16,9 @@ export function dnsRemainingInRound(
           estimated: false,
           enteredAt,
           auto: true,
+          syncStatus: "local" as const,
+          syncError: undefined,
+          remoteResult: undefined,
         }
       : attempt,
   );
@@ -54,6 +57,9 @@ export function stopAttemptAtLimit(
       estimated: false,
       enteredAt,
       auto: false,
+      syncStatus: "local" as const,
+      syncError: undefined,
+      remoteResult: undefined,
     };
   });
 

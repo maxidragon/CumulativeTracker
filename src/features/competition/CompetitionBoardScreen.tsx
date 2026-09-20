@@ -1,5 +1,6 @@
 import { Search } from "@mui/icons-material";
 import {
+  Alert,
   Box,
   Button,
   Card,
@@ -29,6 +30,10 @@ import {
   plansForCompetitor,
 } from "../../lib/wca";
 import { CompetitionState } from "./CompetitionState";
+import { useAuthStore } from "../auth/store";
+import { activeLiveToken } from "../live/mode";
+import { useLiveResults } from "../live/hooks";
+import { reconcileLiveBudget } from "../../lib/wcaLive";
 import { useCompetitionData } from "./data";
 import {
   trackingBudgetKey,
@@ -36,6 +41,7 @@ import {
 } from "./trackingStore";
 import {
   competitorStatus,
+  budgetSyncLabel,
   countryFlag,
   formatAttemptChip,
   summaryForGroup,
@@ -55,6 +61,10 @@ export function CompetitionBoardScreen() {
   const loadCompetition = useTrackingStore((state) => state.loadCompetition);
   const ensureBudgets = useTrackingStore((state) => state.ensureBudgets);
   const tracking = useTrackingStore((state) => state.competitions[competitionId]);
+  const replaceBudget = useTrackingStore((state) => state.replaceBudget);
+  const session = useAuthStore((state) => state.session);
+  const liveToken = activeLiveToken(competitionId, tracking, session);
+  const liveResults = useLiveResults(competitionId, liveToken !== null);
   const [search, setSearch] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -83,6 +93,18 @@ export function CompetitionBoardScreen() {
   useEffect(() => {
     if (defaultBudgets.length > 0) ensureBudgets(competitionId, defaultBudgets);
   }, [competitionId, defaultBudgets, ensureBudgets]);
+  useEffect(() => {
+    if (!group || !liveResults.data || !tracking) return;
+    for (const person of people) {
+      const key = trackingBudgetKey(group.key, person.registrantId);
+      const current = tracking.budgets[key];
+      if (!current) continue;
+      const reconciled = reconcileLiveBudget(current, group, liveResults.data);
+      if (JSON.stringify(reconciled) !== JSON.stringify(current)) {
+        replaceBudget(competitionId, reconciled);
+      }
+    }
+  }, [competitionId, group, liveResults.data, people, replaceBudget, tracking]);
   useEffect(() => {
     const focusSearch = (event: KeyboardEvent) => {
       const target = event.target instanceof HTMLElement ? event.target : null;
@@ -149,6 +171,7 @@ export function CompetitionBoardScreen() {
             <Typography component="h1" variant="h2">
               {groupTitle(group)}
             </Typography>
+            {liveToken ? <Chip color="primary" label="WCA Live mode" size="small" /> : null}
             <Typography color="text.secondary" sx={{ mt: 1 }}>
               {rows.length} competitor{rows.length === 1 ? "" : "s"} · sorted by time
               remaining
@@ -171,6 +194,12 @@ export function CompetitionBoardScreen() {
             value={search}
           />
 
+          {liveToken && liveResults.isError ? (
+            <Alert severity="warning">
+              WCA Live results could not be refreshed. Local entry remains available.
+            </Alert>
+          ) : null}
+
           <TableContainer sx={{ display: { xs: "none", md: "block" } }}>
             <Table>
               <TableHead>
@@ -181,6 +210,7 @@ export function CompetitionBoardScreen() {
                   <TableCell align="right">Remaining</TableCell>
                   <TableCell align="right">Next cap</TableCell>
                   <TableCell>Status</TableCell>
+                  {liveToken ? <TableCell>Sync</TableCell> : null}
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -227,6 +257,7 @@ export function CompetitionBoardScreen() {
                     <TableCell>
                       <Chip color={statusColor[status]} label={status} size="small" />
                     </TableCell>
+                    {liveToken ? <TableCell>{budgetSyncLabel(budget)}</TableCell> : null}
                   </TableRow>
                 ))}
               </TableBody>
@@ -234,7 +265,7 @@ export function CompetitionBoardScreen() {
           </TableContainer>
 
           <Stack spacing={2} sx={{ display: { xs: "flex", md: "none" } }}>
-            {rows.map(({ person, summary, status }) => (
+            {rows.map(({ person, budget, summary, status }) => (
               <Card key={person.registrantId} variant="outlined">
                 <CardActionArea component={Link} to={`${person.registrantId}`}>
                   <CardContent>
@@ -251,7 +282,14 @@ export function CompetitionBoardScreen() {
                           Registrant #{person.registrantId}
                         </Typography>
                       </Box>
-                      <Chip color={statusColor[status]} label={status} size="small" />
+                      <Stack spacing={0.5} sx={{ alignItems: "flex-end" }}>
+                        <Chip color={statusColor[status]} label={status} size="small" />
+                        {liveToken ? (
+                          <Typography color="text.secondary" variant="caption">
+                            {budgetSyncLabel(budget)}
+                          </Typography>
+                        ) : null}
+                      </Stack>
                     </Stack>
                     <Stack direction="row" spacing={3} sx={{ mt: 2 }}>
                       <Box>

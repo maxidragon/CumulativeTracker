@@ -79,3 +79,19 @@ export function countryFlag(countryIso2: string): string {
     .map((letter) => String.fromCodePoint(127_397 + letter.charCodeAt(0)))
     .join("");
 }
+
+export function budgetSyncLabel(budget: Budget): string {
+  const entered = budget.attempts.filter(({ outcome }) => outcome !== "skipped");
+  if (entered.length === 0) return "—";
+  if (entered.some(({ syncStatus }) => syncStatus === "failed")) return "Failed";
+  if (entered.some(({ syncStatus }) => syncStatus === "sending")) return "Sending";
+  if (
+    entered.some(
+      ({ remoteResult, syncStatus }) =>
+        remoteResult !== undefined || syncStatus === "local" || syncStatus === undefined,
+    )
+  ) {
+    return "Local";
+  }
+  return "On WCA Live";
+}
