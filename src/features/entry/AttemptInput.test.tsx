@@ -1,0 +1,100 @@
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+import type { TrackedAttempt } from "../../lib/attempt";
+import { AttemptInput } from "./AttemptInput";
+
+const skippedAttempt: TrackedAttempt = {
+  roundId: "333bf-r1",
+  attemptNumber: 2,
+  outcome: "skipped",
+  centiseconds: null,
+  estimated: false,
+  order: 2,
+  enteredAt: "2026-01-01T00:00:00.000Z",
+};
+
+describe("AttemptInput", () => {
+  it("fills numeric keys right to left and commits on Enter", () => {
+    const onCommit = vi.fn();
+    const onMove = vi.fn();
+    render(<AttemptInput attempt={skippedAttempt} onCommit={onCommit} onMove={onMove} />);
+    const input = screen.getByLabelText("Attempt 2");
+
+    for (const key of "12345") fireEvent.keyDown(input, { key });
+    expect(input).toHaveValue("2:03.45");
+
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(onCommit).toHaveBeenLastCalledWith(
+      expect.objectContaining({ outcome: "ok", centiseconds: 12_345 }),
+    );
+    expect(onMove).toHaveBeenCalledWith("next");
+  });
+
+  it.each(["d", "D", "/", "#"])("toggles DNF with the %s key", (key) => {
+    const onCommit = vi.fn();
+    render(<AttemptInput attempt={skippedAttempt} onCommit={onCommit} />);
+    fireEvent.keyDown(screen.getByLabelText("Attempt 2"), { key });
+    expect(onCommit).toHaveBeenLastCalledWith(
+      expect.objectContaining({ outcome: "dnf", centiseconds: null }),
+    );
+    expect(screen.getByText("elapsed time not recorded")).toBeInTheDocument();
+  });
+
+  it.each(["s", "S", "*"])("toggles DNS with the %s key", (key) => {
+    const onCommit = vi.fn();
+    render(<AttemptInput attempt={skippedAttempt} onCommit={onCommit} />);
+    const input = screen.getByLabelText("Attempt 2");
+    fireEvent.keyDown(input, { key });
+    expect(input).toBeDisabled();
+    expect(onCommit).toHaveBeenLastCalledWith(
+      expect.objectContaining({ outcome: "dns", centiseconds: null }),
+    );
+  });
+
+  it("keeps elapsed time when DNF is toggled", () => {
+    const onCommit = vi.fn();
+    render(<AttemptInput attempt={skippedAttempt} onCommit={onCommit} />);
+    const input = screen.getByLabelText("Attempt 2");
+    for (const key of "60000") fireEvent.keyDown(input, { key });
+    fireEvent.keyDown(input, { key: "d" });
+
+    expect(onCommit).toHaveBeenLastCalledWith(
+      expect.objectContaining({ outcome: "dnf", centiseconds: 60_000 }),
+    );
+    expect(input).not.toBeDisabled();
+  });
+
+  it("truncates ten-minute results on blur", () => {
+    const onCommit = vi.fn();
+    render(<AttemptInput attempt={skippedAttempt} onCommit={onCommit} />);
+    const input = screen.getByLabelText("Attempt 2");
+    for (const key of "60047") fireEvent.keyDown(input, { key });
+    fireEvent.blur(input);
+    expect(onCommit).toHaveBeenLastCalledWith(
+      expect.objectContaining({ outcome: "ok", centiseconds: 60_000 }),
+    );
+  });
+
+  it("reverts a draft with Escape and moves backwards with Shift+Enter", () => {
+    const onCommit = vi.fn();
+    const onMove = vi.fn();
+    render(<AttemptInput attempt={skippedAttempt} onCommit={onCommit} onMove={onMove} />);
+    const input = screen.getByLabelText("Attempt 2");
+    fireEvent.keyDown(input, { key: "1" });
+    fireEvent.keyDown(input, { key: "Escape" });
+    expect(input).toHaveValue("");
+    fireEvent.keyDown(input, { key: "Enter", shiftKey: true });
+    expect(onMove).toHaveBeenCalledWith("previous");
+  });
+
+  it("warns without blocking a time over the cap", () => {
+    render(
+      <AttemptInput
+        attempt={{ ...skippedAttempt, outcome: "ok", centiseconds: 20_000 }}
+        capCentiseconds={15_000}
+        onCommit={vi.fn()}
+      />,
+    );
+    expect(screen.getByText(/over the 2:30 cap/i)).toBeInTheDocument();
+  });
+});

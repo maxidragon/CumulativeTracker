@@ -19,8 +19,9 @@ store that time.
 
 ## Status
 
-Milestone M0 is scaffolded: the Vite/React/MUI application shell, hash routes, tests, and
-GitHub Actions workflows are in place. The cumulative engine and attempt input are next.
+Milestones M0 and M1 are implemented: the application shell is in place, and the pure
+cumulative engine plus WCA-style attempt input cover the regulation examples in the specs.
+The standalone calculator is next.
 
 ## Development
 
