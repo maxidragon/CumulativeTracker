@@ -10,7 +10,7 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { formatTime } from "../../lib/attempt";
 import {
@@ -19,6 +19,12 @@ import {
   unsupportedRounds,
 } from "../../lib/wca";
 import { TimeSettingField } from "../calculator/TimeSettingField";
+import {
+  hasCompetitionPermissionHint,
+  useCurrentUser,
+  useManagedCompetitions,
+} from "../auth/api";
+import { useAuthStore } from "../auth/store";
 import { CompetitionState } from "./CompetitionState";
 import { cacheAge, useCompetitionData } from "./data";
 import { useTrackingStore } from "./trackingStore";
@@ -31,11 +37,23 @@ export function CompetitionOverviewScreen() {
     (state) => state.setGroupPerAttemptLimit,
   );
   const tracking = useTrackingStore((state) => state.competitions[competitionId]);
+  const session = useAuthStore((state) => state.session);
+  const currentUser = useCurrentUser();
+  const managedCompetitions = useManagedCompetitions();
+  const [permissionWarningDismissed, setPermissionWarningDismissed] = useState(false);
 
   useEffect(() => loadCompetition(competitionId), [competitionId, loadCompetition]);
 
   const groups = query.data ? extractCompetitionGroups(query.data.wcif) : [];
   const unsupported = query.data ? unsupportedRounds(query.data.wcif) : [];
+  const permissionHint =
+    query.data && currentUser.data && !managedCompetitions.isLoading
+      ? hasCompetitionPermissionHint(
+          currentUser.data,
+          query.data.wcif,
+          managedCompetitions.data ?? [],
+        )
+      : null;
 
   return (
     <CompetitionState
@@ -49,6 +67,9 @@ export function CompetitionOverviewScreen() {
           <Box>
             <Stack direction="row" sx={{ flexWrap: "wrap", gap: 1, mb: 2 }}>
               <Chip color="secondary" label="Local mode" size="small" />
+              {permissionHint ? (
+                <Chip color="success" label="Competition manager" size="small" />
+              ) : null}
               {query.data.fromCache ? (
                 <Chip
                   color="warning"
@@ -64,6 +85,13 @@ export function CompetitionOverviewScreen() {
               Pick a group to track. Attempts stay in this browser and are not sent anywhere.
             </Typography>
           </Box>
+
+          {session && permissionHint === false && !permissionWarningDismissed ? (
+            <Alert onClose={() => setPermissionWarningDismissed(true)} severity="warning">
+              We cannot see that you manage this competition. If you are staff with
+              scoretaking access, WCA Live may still accept your competition token.
+            </Alert>
+          ) : null}
 
           {groups.length === 0 ? (
             <Alert severity="info">

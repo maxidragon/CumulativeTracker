@@ -15,6 +15,8 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { readRecentCompetitions } from "../competition/data";
+import { useManagedCompetitions } from "../auth/api";
+import { useAuthStore } from "../auth/store";
 
 const entryPoints = [
   {
@@ -42,6 +44,8 @@ export function HomeScreen() {
   const [competitionId, setCompetitionId] = useState("");
   const [competitionIdError, setCompetitionIdError] = useState(false);
   const [recent] = useState(readRecentCompetitions);
+  const session = useAuthStore((state) => state.session);
+  const managed = useManagedCompetitions();
 
   const openCompetition = (event: FormEvent) => {
     event.preventDefault();
@@ -142,6 +146,33 @@ export function HomeScreen() {
             Open
           </Button>
         </Stack>
+
+        {session && managed.data && managed.data.length > 0 ? (
+          <Box sx={{ mt: 4 }}>
+            <Typography color="text.secondary" gutterBottom variant="overline">
+              Competitions you manage
+            </Typography>
+            <Stack spacing={1}>
+              {managed.data.map((competition) => (
+                <Button
+                  component={Link}
+                  key={competition.id}
+                  sx={{ justifyContent: "flex-start" }}
+                  to={`/c/${encodeURIComponent(competition.id)}`}
+                  variant="outlined"
+                >
+                  {competition.name}
+                </Button>
+              ))}
+            </Stack>
+          </Box>
+        ) : null}
+
+        {session && managed.isError ? (
+          <Typography color="error" sx={{ mt: 2 }} variant="body2">
+            Managed competitions could not be loaded. You can still enter an id above.
+          </Typography>
+        ) : null}
 
         {recent.length > 0 ? (
           <Box sx={{ mt: 4 }}>

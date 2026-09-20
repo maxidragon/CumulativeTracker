@@ -1,5 +1,6 @@
 import { AppBar, Box, Button, Container, Toolbar, Typography } from "@mui/material";
 import { Link, Outlet } from "react-router-dom";
+import { AuthControls, AuthNotice } from "../features/auth/AuthControls";
 
 export function AppShell() {
   return (
@@ -17,12 +18,14 @@ export function AppShell() {
               Cumulative Tracker
             </Typography>
             <Box sx={{ flexGrow: 1 }} />
+            <AuthControls />
             <Button color="inherit" component={Link} to="/settings">
               Settings
             </Button>
           </Toolbar>
         </Container>
       </AppBar>
+      <AuthNotice />
       <Container component="main" maxWidth="lg" sx={{ py: { xs: 5, md: 9 } }}>
         <Outlet />
       </Container>

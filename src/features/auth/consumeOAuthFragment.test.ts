@@ -42,4 +42,22 @@ describe("consumeOAuthFragment", () => {
     expect(sessionStorage.getItem(oauthStorageKeys.result)).not.toContain("secret");
     expect(window.location.hash).toBe("#/");
   });
+
+  it("restores the route after the user denies access", () => {
+    sessionStorage.setItem(oauthStorageKeys.state, "expected-state");
+    sessionStorage.setItem(oauthStorageKeys.returnRoute, "#/settings");
+    history.replaceState(
+      null,
+      "",
+      "/#error=access_denied&error_description=Denied&state=expected-state",
+    );
+
+    consumeOAuthFragment();
+
+    expect(window.location.hash).toBe("#/settings");
+    expect(JSON.parse(sessionStorage.getItem(oauthStorageKeys.result) ?? "null")).toEqual({
+      status: "error",
+      message: "Denied",
+    });
+  });
 });

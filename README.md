@@ -19,9 +19,9 @@ store that time.
 
 ## Status
 
-Milestones M0 through M3 are implemented: the application shell, cumulative engine,
-WCA-style attempt input, shareable calculator, and competition-backed local tracking are in
-place. WCA sign-in is next.
+Milestones M0 through M4 are implemented: the application shell, cumulative engine,
+WCA-style attempt input, shareable calculator, local competition tracking, and WCA sign-in are
+in place. WCA Live submission and reconciliation are next.
 
 ## Development
 
