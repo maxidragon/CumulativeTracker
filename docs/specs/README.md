@@ -1,8 +1,6 @@
 # Cumulative Tracker — specifications
 
-Cumulative Tracker is a pure-frontend (React + Vite + MUI) tool for tracking WCA
-**cumulative time limits** during a competition, and for entering the resulting attempts
-into WCA Live.
+Cumulative Tracker is a pure-frontend (React + Vite + MUI) tool for tracking WCA **cumulative time limits** during a competition, and for entering the resulting attempts into WCA Live.
 
 Read them in this order:
 

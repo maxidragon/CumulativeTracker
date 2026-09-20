@@ -6,7 +6,7 @@
 | --- | --- | --- |
 | Build | Vite + TypeScript (`strict`) | Static output, fast dev, no server to run |
 | UI | React + MUI | Asked for, and WCA Live is MUI too, so the two feel related |
-| Routing | React Router (`BrowserRouter` with a basename) | Deep links to a group or a competitor; the URL fragment is reserved for the OAuth token |
+| Routing | React Router (`HashRouter`) | GitHub Pages serves no rewrites, so hash routes are the only deep links that survive a cold load; the OAuth fragment is consumed before the router mounts (see [SPEC-003](SPEC-003-ui.md)) |
 | Remote data | TanStack Query | Caching, refetch on focus, polling, request de-duplication — all needed for the WCA Live results poll |
 | Local state | Zustand with a persisting middleware | The tracker state is small, synchronous and must survive a reload; Redux would be ceremony |
 | Event icons | `@cubing/icons` | The standard set |
@@ -107,8 +107,8 @@ GitHub Actions, two workflows:
 - **Deploy** on `main` after CI passes: build with the production environment variables and
   publish to GitHub Pages at `https://maxidragon.github.io/CumulativeTracker/`.
 
-The build sets `base` to the repository path, and the deploy step copies `index.html` to
-`404.html` so client-side deep links survive a cold load on Pages.
+The build sets `base` to the repository path. No `404.html` fallback is needed: with
+`HashRouter` every deep link resolves to `index.html` on its own.
 
 ## Milestones
 
@@ -132,6 +132,11 @@ without an explicit go-ahead.
   time, budget groups, ordering) has no overlap with it. It stays in git history.
 - **Zustand over Context + reducer**: the board re-renders per keystroke in a table of up to a
   few hundred competitors, and selector-based subscriptions keep that cheap without prop-drilling.
+- **`HashRouter`, and implicit OAuth rather than PKCE.** Pages cannot rewrite unknown paths, so
+  hash routes are the deep links that work. PKCE would have kept the fragment free, but the WCA
+  token endpoint answers a cross-origin preflight without any `Access-Control-Allow-*` headers,
+  so a browser cannot do the code exchange — implicit is the only flow available to a static
+  app, and it is what the WCA's own frontend tools use.
 - **Polling over GraphQL subscriptions**: the public results endpoint is keyed by WCA
   competition id and needs no session, and a 30-second poll is well inside what a round needs.
   Revisit if WCA Live's REST results endpoint ever goes away.

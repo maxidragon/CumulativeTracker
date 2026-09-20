@@ -38,7 +38,12 @@ Gives `delegates` and `organizers` for the permission hint, plus name and dates 
 ### Sign-in — OAuth implicit flow
 
 The app is a public client with no secret, so it uses the implicit flow, as
-[`thewca/scrambles-matcher`](https://github.com/thewca/scrambles-matcher) and Groupifier do:
+[`thewca/scrambles-matcher`](https://github.com/thewca/scrambles-matcher) and Groupifier do.
+Authorization code with PKCE would be the modern choice and would keep the URL fragment free,
+but it is not available to us: an `OPTIONS` preflight to
+`https://www.worldcubeassociation.org/oauth/token` from a browser origin returns `200` with no
+`Access-Control-Allow-*` headers at all, so the code-for-token exchange cannot be made from a
+static frontend. Re-check this before assuming it still holds.
 
 ```
 https://www.worldcubeassociation.org/oauth/authorize
@@ -46,11 +51,14 @@ https://www.worldcubeassociation.org/oauth/authorize
   &response_type=token
   &redirect_uri=<app origin + basename>
   &scope=public manage_competitions
+  &state=<random nonce>
 ```
 
-The access token comes back in the URL **fragment** (`#access_token=…&expires_in=…`). The app
-reads it before the router mounts, clears the fragment immediately, and stores the token with
-its expiry. There is no refresh token: when it expires, the user signs in again. Authenticated
+The access token comes back in the URL **fragment** (`#access_token=…&state=…&expires_in=…`),
+which the app shares with its hash router. The token is read and the fragment replaced with the
+user's return route **before the router mounts** — the sequence is specified in
+[SPEC-003](SPEC-003-ui.md). `state` is generated per sign-in, stashed in `sessionStorage`, and
+verified on return; a mismatch discards the token. The token is stored with its expiry. There is no refresh token: when it expires, the user signs in again. Authenticated
 calls carry `Authorization: Bearer <token>`.
 
 Signed-in calls the app makes:

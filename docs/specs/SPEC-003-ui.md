@@ -6,19 +6,44 @@ looking. Those two situations drive every decision below.
 
 ## Routes
 
+Routing uses **`HashRouter`**. GitHub Pages has no rewrite rule, so a cold load of a deep path
+under `BrowserRouter` is served as a 404; the `404.html` workaround exists but returns an HTTP
+404 status and re-enters the app through an error page. A hash route is just a fragment — Pages
+only ever serves `index.html`, and deep links work without any server-side cooperation.
+
 | Route | Screen |
 | --- | --- |
-| `/` | Home: start a calculator, or open a competition by id (recent competitions listed from `localStorage`) |
-| `/calculator` | Calculator, state encoded in the query string |
-| `/c/:competitionId` | Competition overview: cumulative groups, rounds, mode switch, sign-in and token state |
-| `/c/:competitionId/g/:groupKey` | Board: every competitor in the group with their budget |
-| `/c/:competitionId/g/:groupKey/:registrantId` | Competitor view: attempts, entry, budget detail |
-| `/settings` | Theme, stored tokens, stored competition data, clear-everything |
-| `/oauth/callback` | Consumes the implicit-flow token from the URL fragment, then redirects back |
+| `#/` | Home: start a calculator, or open a competition by id (recent competitions listed from `localStorage`) |
+| `#/calculator` | Calculator, state encoded in the route's query string |
+| `#/c/:competitionId` | Competition overview: cumulative groups, rounds, mode switch, sign-in and token state |
+| `#/c/:competitionId/g/:groupKey` | Board: every competitor in the group with their budget |
+| `#/c/:competitionId/g/:groupKey/:registrantId` | Competitor view: attempts, entry, budget detail |
+| `#/settings` | Theme, stored tokens, stored competition data, clear-everything |
 
-Routing uses `BrowserRouter` with a basename, **not** `HashRouter`: the WCA implicit OAuth flow
-returns the access token in the URL fragment, and a hash router would fight it for the same
-character. GitHub Pages deep links are handled by a `404.html` that re-serves `index.html`.
+### The hash is shared with OAuth
+
+WCA's implicit flow returns the access token in the URL fragment, which is the same character a
+hash router lives in. They do not actually collide, as long as the order is fixed and never
+varies:
+
+1. Before signing in, the current hash route and a random `state` nonce are stashed in
+   `sessionStorage`.
+2. WCA redirects back to the app root with `#access_token=…&state=…&expires_in=…`. There is no
+   route in that fragment, by construction.
+3. **The very first statement the app runs**, before React and before the router mounts, checks
+   whether the fragment parses as OAuth parameters rather than a route — the test is the
+   presence of `access_token`. If it does, the token is taken, `state` is verified against the
+   stashed nonce, and the fragment is immediately replaced with the stashed return route via
+   `history.replaceState`.
+4. Only then does the router mount, and it sees an ordinary route.
+
+This is the same trick `thewca/scrambles-matcher` uses ("should be called on application
+initialization, before any kind of router takes over the location"); the only addition is
+restoring the route the user came from, which matters more here because the fragment they left
+from is the one WCA overwrites.
+
+A fragment that contains `error=` (the user denied access) is handled in the same step: no
+token, return route restored, message shown.
 
 ## The attempt input
 
