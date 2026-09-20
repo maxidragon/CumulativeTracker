@@ -64,6 +64,7 @@ describe("WCA time input", () => {
     expect(formatTime(6_421)).toBe("1:04.21");
     expect(formatTime(372_345, { preserveCentiseconds: true })).toBe("1:02:03.45");
     expect(formatTime(120_000, { compact: true })).toBe("20:00");
+    expect(parseTimeInput("20:00")).toBe(120_000);
   });
 
   it("truncates attempts of ten minutes or more to whole seconds", () => {

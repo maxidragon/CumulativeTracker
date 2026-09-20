@@ -123,17 +123,18 @@ export function attemptsLeftForRound(
   const enteredCount = roundAttempts.filter(isEnteredAttempt).length;
   const normalRemaining = Math.max(0, total - enteredCount);
 
-  if (!plan.cutoff) return normalRemaining;
+  const cutoff = plan.cutoff;
+  if (!cutoff) return normalRemaining;
 
   const cutoffAttempts = roundAttempts.filter(
     (attempt) =>
-      attempt.attemptNumber <= plan.cutoff!.numberOfAttempts && isEnteredAttempt(attempt),
+      attempt.attemptNumber <= cutoff.numberOfAttempts && isEnteredAttempt(attempt),
   );
-  const cutoffComplete = cutoffAttempts.length >= plan.cutoff.numberOfAttempts;
+  const cutoffComplete = cutoffAttempts.length >= cutoff.numberOfAttempts;
 
   if (
     cutoffComplete &&
-    !cutoffPassed(cutoffAttempts, plan.cutoff.attemptResult)
+    !cutoffPassed(cutoffAttempts, cutoff.attemptResult)
   ) {
     return 0;
   }

@@ -1,7 +1,13 @@
+import { Box, CircularProgress } from "@mui/material";
+import { lazy, Suspense } from "react";
 import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
 import { PlaceholderScreen } from "../components/PlaceholderScreen";
 import { AppShell } from "./AppShell";
 import { HomeScreen } from "../features/home/HomeScreen";
+
+const CalculatorScreen = lazy(async () => ({
+  default: (await import("../features/calculator/CalculatorScreen")).CalculatorScreen,
+}));
 
 export function AppRouter() {
   return (
@@ -12,11 +18,15 @@ export function AppRouter() {
           <Route
             path="calculator"
             element={
-              <PlaceholderScreen
-                eyebrow="Calculator"
-                title="Track a budget without a competition"
-                description="The cumulative engine and WCA-style attempt input arrive in the next milestone."
-              />
+              <Suspense
+                fallback={
+                  <Box aria-label="Loading calculator" sx={{ display: "grid", placeItems: "center", py: 10 }}>
+                    <CircularProgress />
+                  </Box>
+                }
+              >
+                <CalculatorScreen />
+              </Suspense>
             }
           />
           <Route

@@ -18,16 +18,16 @@ export function parseTimeInput(input: string): number | null {
     return Number.isSafeInteger(centiseconds) ? centiseconds : null;
   }
 
-  const match = value.match(/^(\d+(?::\d{1,2}){0,2})\.(\d{2})$/);
+  const match = value.match(/^(\d+(?::\d{1,2}){0,2})(?:\.(\d{2}))?$/);
   if (!match) return null;
 
   const [, clockText, hundredthsText] = match;
-  if (clockText === undefined || hundredthsText === undefined) return null;
+  if (clockText === undefined) return null;
   const clockParts = clockText.split(":").map(Number);
   const seconds = clockParts.at(-1) ?? 0;
   const minutes = clockParts.length >= 2 ? (clockParts.at(-2) ?? 0) : 0;
   const hours = clockParts.length === 3 ? (clockParts[0] ?? 0) : 0;
-  const hundredths = Number(hundredthsText);
+  const hundredths = Number(hundredthsText ?? 0);
   if (seconds >= 60 || (clockParts.length === 3 && minutes >= 60)) return null;
 
   const centiseconds =

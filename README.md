@@ -19,9 +19,9 @@ store that time.
 
 ## Status
 
-Milestones M0 and M1 are implemented: the application shell is in place, and the pure
-cumulative engine plus WCA-style attempt input cover the regulation examples in the specs.
-The standalone calculator is next.
+Milestones M0 through M2 are implemented: the application shell, pure cumulative engine,
+WCA-style attempt input, and shareable standalone calculator are in place. Competition-backed
+local tracking is next.
 
 ## Development
 
