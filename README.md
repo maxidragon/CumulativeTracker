@@ -19,8 +19,26 @@ store that time.
 
 ## Status
 
-Specification stage. The implementation starts from scratch; the earlier prototype was removed
-and remains in git history.
+Milestone M0 is scaffolded: the Vite/React/MUI application shell, hash routes, tests, and
+GitHub Actions workflows are in place. The cumulative engine and attempt input are next.
+
+## Development
+
+Requires Node.js 24 and npm.
+
+```sh
+npm install
+npm run dev
+```
+
+Before opening a pull request, run the same checks as CI:
+
+```sh
+npm run lint
+npm run typecheck
+npm test
+npm run build
+```
 
 ## Documentation
 
