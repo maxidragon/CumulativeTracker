@@ -83,4 +83,23 @@ describe("competition tracking store", () => {
       }),
     ).toBe(false);
   });
+
+  it("migrates tracking saved before the WCA Live mode flag existed", () => {
+    localStorage.setItem(
+      storageKeys.budgets("InventedOpen2026"),
+      JSON.stringify({
+        version: 1,
+        budgets: {},
+        groupSettings: {},
+      }),
+    );
+    useTrackingStore.getState().loadCompetition("InventedOpen2026");
+    expect(useTrackingStore.getState().competitions.InventedOpen2026).toMatchObject({
+      version: 1,
+      liveEnabled: false,
+    });
+    expect(localStorage.getItem(storageKeys.budgets("InventedOpen2026"))).toContain(
+      '"liveEnabled":false',
+    );
+  });
 });

@@ -1,4 +1,11 @@
-import { ArrowDownward, ArrowUpward } from "@mui/icons-material";
+import {
+  ArrowDownward,
+  ArrowUpward,
+  CloudDoneOutlined,
+  CloudOffOutlined,
+  HourglassTop,
+  SaveOutlined,
+} from "@mui/icons-material";
 import {
   Alert,
   Box,
@@ -439,6 +446,17 @@ export function CompetitorScreen() {
                                     : attempt.syncStatus === "failed"
                                       ? "Failed"
                                       : "Local"
+                            }
+                            icon={
+                              attempt.syncStatus === "synced" ? (
+                                <CloudDoneOutlined aria-hidden="true" />
+                              ) : attempt.syncStatus === "failed" ? (
+                                <CloudOffOutlined aria-hidden="true" />
+                              ) : attempt.syncStatus === "sending" ? (
+                                <HourglassTop aria-hidden="true" />
+                              ) : (
+                                <SaveOutlined aria-hidden="true" />
+                              )
                             }
                             size="small"
                           />

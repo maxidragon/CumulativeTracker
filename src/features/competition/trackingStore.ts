@@ -12,6 +12,7 @@ export type CompetitionTracking = {
 
 type TrackingStore = {
   competitions: Record<string, CompetitionTracking>;
+  resetTracking: () => void;
   loadCompetition: (competitionId: string) => void;
   ensureBudgets: (competitionId: string, budgets: Budget[]) => void;
   updateAttempt: (
@@ -93,6 +94,43 @@ export function isCompetitionTracking(value: unknown): value is CompetitionTrack
   );
 }
 
+type LegacyCompetitionTracking = Omit<CompetitionTracking, "liveEnabled">;
+
+function isLegacyCompetitionTracking(value: unknown): value is LegacyCompetitionTracking {
+  if (
+    !isRecord(value) ||
+    value.version !== 1 ||
+    !isRecord(value.budgets) ||
+    !isRecord(value.groupSettings) ||
+    "liveEnabled" in value
+  ) {
+    return false;
+  }
+  return (
+    Object.values(value.budgets).every(isBudget) &&
+    Object.values(value.groupSettings).every(
+      (setting) =>
+        setting === null || (Number.isSafeInteger(setting) && (setting as number) > 0),
+    )
+  );
+}
+
+function isStoredCompetitionTracking(
+  value: unknown,
+): value is CompetitionTracking | LegacyCompetitionTracking {
+  return isCompetitionTracking(value) || isLegacyCompetitionTracking(value);
+}
+
+function readCompetitionTracking(competitionId: string): CompetitionTracking {
+  const stored = readJson(
+    storageKeys.budgets(competitionId),
+    isStoredCompetitionTracking,
+  );
+  if (!stored) return emptyTracking();
+  if ("liveEnabled" in stored) return stored;
+  return persist(competitionId, { ...stored, liveEnabled: false });
+}
+
 function persist(competitionId: string, tracking: CompetitionTracking): CompetitionTracking {
   writeJson(storageKeys.budgets(competitionId), tracking);
   return tracking;
@@ -100,11 +138,11 @@ function persist(competitionId: string, tracking: CompetitionTracking): Competit
 
 export const useTrackingStore = create<TrackingStore>((set) => ({
   competitions: {},
+  resetTracking: () => set({ competitions: {} }),
   loadCompetition: (competitionId) =>
     set(({ competitions }) => {
       if (competitions[competitionId]) return { competitions };
-      const tracking =
-        readJson(storageKeys.budgets(competitionId), isCompetitionTracking) ?? emptyTracking();
+      const tracking = readCompetitionTracking(competitionId);
       return { competitions: { ...competitions, [competitionId]: tracking } };
     }),
   ensureBudgets: (competitionId, budgets) =>

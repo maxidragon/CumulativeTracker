@@ -19,10 +19,10 @@ store that time.
 
 ## Status
 
-Milestones M0 through M5 are implemented: the application shell, cumulative engine,
-WCA-style attempt input, shareable calculator, local competition tracking, WCA sign-in, and
-WCA Live submission and reconciliation are in place. Accessibility, appearance, and recovery
-polish are next.
+Milestones M0 through M6 are implemented: the application shell, cumulative engine,
+WCA-style attempt input, shareable calculator, local competition tracking, WCA sign-in,
+WCA Live submission and reconciliation, dark-mode preferences, accessible status treatments,
+and local-data recovery controls are in place.
 
 ## Development
 

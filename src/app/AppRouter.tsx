@@ -1,7 +1,7 @@
 import { Box, CircularProgress } from "@mui/material";
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, type ReactNode } from "react";
 import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
-import { PlaceholderScreen } from "../components/PlaceholderScreen";
+import { RouteErrorBoundary } from "../components/RouteErrorBoundary";
 import { AppShell } from "./AppShell";
 import { HomeScreen } from "../features/home/HomeScreen";
 
@@ -20,6 +20,9 @@ const CompetitorScreen = lazy(async () => ({
   default: (await import("../features/competition/CompetitorScreen"))
     .CompetitorScreen,
 }));
+const SettingsScreen = lazy(async () => ({
+  default: (await import("../features/settings/SettingsScreen")).SettingsScreen,
+}));
 
 function RouteLoading({ label }: { label: string }) {
   return (
@@ -29,54 +32,75 @@ function RouteLoading({ label }: { label: string }) {
   );
 }
 
+function RouteContent({
+  children,
+  loadingLabel,
+}: {
+  children: ReactNode;
+  loadingLabel?: string;
+}) {
+  return (
+    <RouteErrorBoundary>
+      {loadingLabel ? (
+        <Suspense fallback={<RouteLoading label={loadingLabel} />}>{children}</Suspense>
+      ) : (
+        children
+      )}
+    </RouteErrorBoundary>
+  );
+}
+
 export function AppRouter() {
   return (
     <HashRouter>
       <Routes>
         <Route element={<AppShell />}>
-          <Route index element={<HomeScreen />} />
+          <Route
+            index
+            element={
+              <RouteContent>
+                <HomeScreen />
+              </RouteContent>
+            }
+          />
           <Route
             path="calculator"
             element={
-              <Suspense
-                fallback={<RouteLoading label="Loading calculator" />}
-              >
+              <RouteContent loadingLabel="Loading calculator">
                 <CalculatorScreen />
-              </Suspense>
+              </RouteContent>
             }
           />
           <Route
             path="c/:competitionId"
             element={
-              <Suspense fallback={<RouteLoading label="Loading competition" />}>
+              <RouteContent loadingLabel="Loading competition">
                 <CompetitionOverviewScreen />
-              </Suspense>
+              </RouteContent>
             }
           />
           <Route
             path="c/:competitionId/g/:groupKey"
             element={
-              <Suspense fallback={<RouteLoading label="Loading group" />}>
+              <RouteContent loadingLabel="Loading group">
                 <CompetitionBoardScreen />
-              </Suspense>
+              </RouteContent>
             }
           />
           <Route
             path="c/:competitionId/g/:groupKey/:registrantId"
             element={
-              <Suspense fallback={<RouteLoading label="Loading competitor" />}>
+              <RouteContent loadingLabel="Loading competitor">
                 <CompetitorScreen />
-              </Suspense>
+              </RouteContent>
             }
           />
           <Route
             path="settings"
             element={
-              <PlaceholderScreen
-                eyebrow="Settings"
-                title="Preferences and stored data"
-                description="Theme overrides, tokens, and data controls will live here."
-              />
+              <RouteContent loadingLabel="Loading settings">
+                <SettingsScreen />
+              </RouteContent>
             }
           />
           <Route path="*" element={<Navigate replace to="/" />} />

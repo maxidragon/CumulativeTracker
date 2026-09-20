@@ -7,7 +7,10 @@ export function AppShell() {
     <Box sx={{ minHeight: "100dvh" }}>
       <AppBar color="transparent" elevation={0} position="static">
         <Container maxWidth="lg">
-          <Toolbar disableGutters sx={{ minHeight: 72 }}>
+          <Toolbar
+            disableGutters
+            sx={{ flexWrap: { xs: "wrap", sm: "nowrap" }, minHeight: 72, py: 1 }}
+          >
             <Typography
               color="text.primary"
               component={Link}
@@ -15,7 +18,12 @@ export function AppShell() {
               to="/"
               variant="h6"
             >
-              Cumulative Tracker
+              <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>
+                Cumulative Tracker
+              </Box>
+              <Box component="span" sx={{ display: { xs: "inline", sm: "none" } }}>
+                Tracker
+              </Box>
             </Typography>
             <Box sx={{ flexGrow: 1 }} />
             <AuthControls />
@@ -26,7 +34,7 @@ export function AppShell() {
         </Container>
       </AppBar>
       <AuthNotice />
-      <Container component="main" maxWidth="lg" sx={{ py: { xs: 5, md: 9 } }}>
+      <Container component="main" maxWidth="lg" sx={{ py: { xs: 3, md: 9 } }}>
         <Outlet />
       </Container>
     </Box>

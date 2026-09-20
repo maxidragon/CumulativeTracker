@@ -1,4 +1,15 @@
-import { Search } from "@mui/icons-material";
+import {
+  CheckCircleOutlined,
+  CloudDoneOutlined,
+  CloudOffOutlined,
+  ErrorOutlined,
+  HelpOutlined,
+  HourglassTop,
+  RadioButtonUnchecked,
+  SaveOutlined,
+  Search,
+  WarningAmber,
+} from "@mui/icons-material";
 import {
   Alert,
   Box,
@@ -18,7 +29,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import { Link, useParams } from "react-router-dom";
 import { formatTime } from "../../lib/attempt";
 import { attemptsLeft } from "../../lib/cumulative";
@@ -46,6 +57,7 @@ import {
   formatAttemptChip,
   summaryForGroup,
 } from "./viewModel";
+import type { CompetitorStatus } from "./viewModel";
 
 const statusColor = {
   "Not started": "default",
@@ -54,6 +66,37 @@ const statusColor = {
   Exhausted: "error",
   Incomplete: "warning",
 } as const;
+
+const statusIcon: Record<CompetitorStatus, ReactElement> = {
+  "Not started": <RadioButtonUnchecked aria-hidden="true" />,
+  "On track": <CheckCircleOutlined aria-hidden="true" />,
+  Tight: <WarningAmber aria-hidden="true" />,
+  Exhausted: <ErrorOutlined aria-hidden="true" />,
+  Incomplete: <HelpOutlined aria-hidden="true" />,
+};
+
+function SyncStatus({ label }: { label: string }) {
+  if (label === "—") return <Typography color="text.secondary">—</Typography>;
+  const icon =
+    label === "On WCA Live" ? (
+      <CloudDoneOutlined aria-hidden="true" />
+    ) : label === "Failed" ? (
+      <CloudOffOutlined aria-hidden="true" />
+    ) : label === "Sending" ? (
+      <HourglassTop aria-hidden="true" />
+    ) : (
+      <SaveOutlined aria-hidden="true" />
+    );
+  return (
+    <Chip
+      color={label === "On WCA Live" ? "success" : label === "Failed" ? "error" : "default"}
+      icon={icon}
+      label={label}
+      size="small"
+      variant="outlined"
+    />
+  );
+}
 
 export function CompetitionBoardScreen() {
   const { competitionId = "", groupKey = "" } = useParams();
@@ -255,9 +298,16 @@ export function CompetitionBoardScreen() {
                       )}
                     </TableCell>
                     <TableCell>
-                      <Chip color={statusColor[status]} label={status} size="small" />
+                      <Chip
+                        color={statusColor[status]}
+                        icon={statusIcon[status]}
+                        label={status}
+                        size="small"
+                      />
                     </TableCell>
-                    {liveToken ? <TableCell>{budgetSyncLabel(budget)}</TableCell> : null}
+                    {liveToken ? (
+                      <TableCell><SyncStatus label={budgetSyncLabel(budget)} /></TableCell>
+                    ) : null}
                   </TableRow>
                 ))}
               </TableBody>
@@ -283,11 +333,14 @@ export function CompetitionBoardScreen() {
                         </Typography>
                       </Box>
                       <Stack spacing={0.5} sx={{ alignItems: "flex-end" }}>
-                        <Chip color={statusColor[status]} label={status} size="small" />
+                        <Chip
+                          color={statusColor[status]}
+                          icon={statusIcon[status]}
+                          label={status}
+                          size="small"
+                        />
                         {liveToken ? (
-                          <Typography color="text.secondary" variant="caption">
-                            {budgetSyncLabel(budget)}
-                          </Typography>
+                          <SyncStatus label={budgetSyncLabel(budget)} />
                         ) : null}
                       </Stack>
                     </Stack>

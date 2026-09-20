@@ -10,6 +10,7 @@ import {
 
 type CalculatorStore = {
   calculator: CalculatorState;
+  resetCalculator: () => void;
   replaceCalculator: (calculator: CalculatorState) => void;
   updateAttempt: (attempt: TrackedAttempt) => void;
   updateLimits: (limit: number, perAttempt: number | null) => void;
@@ -32,6 +33,7 @@ function persist(calculator: CalculatorState): CalculatorState {
 
 export const useCalculatorStore = create<CalculatorStore>((set) => ({
   calculator: initialCalculator(),
+  resetCalculator: () => set({ calculator: defaultCalculatorState }),
   replaceCalculator: (calculator) => set({ calculator: persist(calculator) }),
   updateAttempt: (attempt) =>
     set(({ calculator }) => ({
