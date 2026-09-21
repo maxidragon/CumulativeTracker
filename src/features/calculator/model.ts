@@ -88,10 +88,17 @@ export const calculatorPresets: CalculatorPreset[] = [
   },
 ];
 
-function createAttempts(rounds: CalculatorRound[]): TrackedAttempt[] {
+function createAttempts(
+  rounds: CalculatorRound[],
+  customAttemptCount?: number,
+): TrackedAttempt[] {
   let order = 0;
   return rounds.flatMap((round) =>
-    Array.from({ length: attemptsForFormat(round.format) }, (_, index) => ({
+    Array.from(
+      {
+        length: customAttemptCount ?? attemptsForFormat(round.format),
+      },
+      (_, index) => ({
       roundId: round.roundId,
       attemptNumber: index + 1,
       outcome: "skipped" as const,
@@ -99,7 +106,8 @@ function createAttempts(rounds: CalculatorRound[]): TrackedAttempt[] {
       estimated: false,
       order: ++order,
       enteredAt: "",
-    })),
+      }),
+    ),
   );
 }
 
@@ -120,10 +128,13 @@ export function createCustomCalculatorState(
   limitCentiseconds = 120_000,
 ): CalculatorState {
   const eventName = timedEvents.find(([id]) => id === eventId)?.[1] ?? eventId;
-  const format = ({ 1: "1", 2: "2", 3: "3", 5: "5" } as const)[
-    attemptCount as 1 | 2 | 3 | 5
-  ];
-  if (!format) throw new Error("A calculator can have 1, 2, 3, or 5 attempts.");
+  if (!Number.isSafeInteger(attemptCount) || attemptCount < 1 || attemptCount > 100) {
+    throw new Error("A calculator can have between 1 and 100 attempts.");
+  }
+  const customFormat = ![1, 2, 3, 5].includes(attemptCount);
+  const format: RoundFormat = customFormat
+    ? "a"
+    : String(attemptCount) as RoundFormat;
   const rounds = [{ roundId: `${eventId}-r1`, eventId, eventName, format }];
   return {
     version: 1,
@@ -131,7 +142,7 @@ export function createCustomCalculatorState(
     rounds,
     limitCentiseconds,
     perAttemptLimitCentiseconds: null,
-    attempts: createAttempts(rounds),
+    attempts: createAttempts(rounds, customFormat ? attemptCount : undefined),
   };
 }
 

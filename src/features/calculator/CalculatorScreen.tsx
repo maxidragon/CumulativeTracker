@@ -12,6 +12,7 @@ import {
   MenuItem,
   Select,
   Stack,
+  TextField,
   Typography,
 } from "@mui/material";
 import { useEffect, useMemo, useState } from "react";
@@ -56,6 +57,13 @@ export function CalculatorScreen() {
       (minutes) => minutes * 6_000 === calculator.limitCentiseconds,
     ),
   );
+  const [customAttempts, setCustomAttempts] = useState(
+    ![1, 2, 3, 5].includes(calculator.attempts.length),
+  );
+  const [customAttemptsDraft, setCustomAttemptsDraft] = useState(
+    String(calculator.attempts.length),
+  );
+  const [customAttemptsError, setCustomAttemptsError] = useState(false);
 
   useEffect(() => {
     setSearchParams({ state: encodeCalculatorState(calculator) }, { replace: true });
@@ -97,6 +105,22 @@ export function CalculatorScreen() {
       state,
       description: `This changes the calculator setup and clears ${enteredCount} entered attempt${enteredCount === 1 ? "" : "s"}.`,
     });
+  };
+
+  const commitCustomAttempts = () => {
+    const count = Number(customAttemptsDraft);
+    if (!Number.isSafeInteger(count) || count < 1 || count > 100) {
+      setCustomAttemptsError(true);
+      return;
+    }
+    setCustomAttemptsError(false);
+    const next = createCustomCalculatorState(
+      undefined,
+      count,
+      calculator.limitCentiseconds,
+    );
+    next.perAttemptLimitCentiseconds = calculator.perAttemptLimitCentiseconds;
+    requestReplacement(next);
   };
 
   const runPendingAction = () => {
@@ -191,6 +215,13 @@ export function CalculatorScreen() {
                       label="Attempts"
                       labelId="attempt-count-label"
                       onChange={(event) => {
+                        if (event.target.value === "custom") {
+                          setCustomAttempts(true);
+                          setCustomAttemptsDraft(String(calculator.attempts.length));
+                          setCustomAttemptsError(false);
+                          return;
+                        }
+                        setCustomAttempts(false);
                         const next = createCustomCalculatorState(
                           undefined,
                           Number(event.target.value),
@@ -200,16 +231,47 @@ export function CalculatorScreen() {
                           calculator.perAttemptLimitCentiseconds;
                         requestReplacement(next);
                       }}
-                      value={calculator.attempts.length}
+                      value={
+                        customAttempts || ![1, 2, 3, 5].includes(calculator.attempts.length)
+                          ? "custom"
+                          : calculator.attempts.length
+                      }
                     >
                       {[1, 2, 3, 5].map((count) => (
                         <MenuItem key={count} value={count}>
                           {count}
                         </MenuItem>
                       ))}
+                      <MenuItem value="custom">
+                        Custom
+                      </MenuItem>
                     </Select>
                   </FormControl>
                 </Grid>
+                {customAttempts || ![1, 2, 3, 5].includes(calculator.attempts.length) ? (
+                  <Grid size={{ xs: 12, sm: 4 }}>
+                    <TextField
+                      error={customAttemptsError}
+                      fullWidth
+                      helperText={customAttemptsError ? "Enter a whole number from 1 to 100." : "1–100 attempts"}
+                      label="Custom attempts"
+                      onBlur={commitCustomAttempts}
+                      onChange={(event) => {
+                        setCustomAttemptsDraft(event.target.value);
+                        setCustomAttemptsError(false);
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          commitCustomAttempts();
+                        }
+                      }}
+                      slotProps={{ htmlInput: { inputMode: "numeric", min: 1, max: 100 } }}
+                      type="number"
+                      value={customAttemptsDraft}
+                    />
+                  </Grid>
+                ) : null}
               </>
             ) : null}
 

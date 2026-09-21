@@ -30,6 +30,16 @@ describe("AttemptInput", () => {
     expect(onMove).toHaveBeenCalledWith("next");
   });
 
+  it("keeps explicit zero centiseconds in an entered time", () => {
+    render(
+      <AttemptInput
+        attempt={{ ...skippedAttempt, outcome: "ok", centiseconds: 1_200 }}
+        onCommit={vi.fn()}
+      />,
+    );
+    expect(screen.getByLabelText("Attempt 2")).toHaveValue("12.00");
+  });
+
   it.each(["d", "D", "/", "#"])("toggles DNF with the %s key", (key) => {
     const onCommit = vi.fn();
     render(<AttemptInput attempt={skippedAttempt} onCommit={onCommit} />);
