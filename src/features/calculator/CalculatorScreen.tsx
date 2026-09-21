@@ -20,7 +20,6 @@ import { ConfirmActionDialog } from "../../components/ConfirmActionDialog";
 import { formatTime } from "../../lib/attempt";
 import {
   attemptsLeft,
-  attemptsForFormat,
   averageForRemainingAttempts,
   budgetBeforeAttempt,
   deriveBudget,
@@ -32,11 +31,9 @@ import {
 } from "../../lib/cumulative";
 import { AttemptInput } from "../entry/AttemptInput";
 import {
-  calculatorPresets,
+  calculatorLimitPresets,
   createCustomCalculatorState,
   encodeCalculatorState,
-  stateFromPreset,
-  timedEvents,
   type CalculatorState,
 } from "./model";
 import { useCalculatorStore } from "./store";
@@ -54,6 +51,11 @@ export function CalculatorScreen() {
   const updateLimits = useCalculatorStore((state) => state.updateLimits);
   const [, setSearchParams] = useSearchParams();
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
+  const [customLimit, setCustomLimit] = useState(
+    !calculatorLimitPresets.some(
+      (minutes) => minutes * 6_000 === calculator.limitCentiseconds,
+    ),
+  );
 
   useEffect(() => {
     setSearchParams({ state: encodeCalculatorState(calculator) }, { replace: true });
@@ -119,8 +121,12 @@ export function CalculatorScreen() {
     setPendingAction(null);
   };
 
-  const selectedPreset = calculator.presetId ?? "custom";
   const customRound = calculator.rounds[0];
+  const isCustomLimit =
+    customLimit ||
+    !calculatorLimitPresets.some(
+      (minutes) => minutes * 6_000 === calculator.limitCentiseconds,
+    );
 
   return (
     <Stack spacing={5}>
@@ -138,65 +144,43 @@ export function CalculatorScreen() {
       <Card variant="outlined">
         <CardContent>
           <Grid container spacing={2}>
-            <Grid size={{ xs: 12 }}>
-              <FormControl fullWidth>
-                <InputLabel id="preset-label">Setup</InputLabel>
-                <Select
-                  label="Setup"
-                  labelId="preset-label"
-                  onChange={(event) => {
-                    if (event.target.value === "custom") {
-                      requestReplacement(
-                        createCustomCalculatorState(
-                          customRound?.eventId,
-                          customRound ? attemptsForFormat(customRound.format) : 3,
-                          calculator.limitCentiseconds,
-                        ),
-                      );
-                      return;
-                    }
-                    const preset = calculatorPresets.find(
-                      ({ id }) => id === event.target.value,
-                    );
-                    if (preset) requestReplacement(stateFromPreset(preset));
-                  }}
-                  value={selectedPreset}
-                >
-                  {calculatorPresets.map((preset) => (
-                    <MenuItem key={preset.id} value={preset.id}>
-                      {preset.label}
-                    </MenuItem>
-                  ))}
-                  <MenuItem value="custom">Custom setup</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-
-            {calculator.presetId === null && customRound ? (
+            {customRound ? (
               <>
                 <Grid size={{ xs: 12, sm: 8 }}>
                   <FormControl fullWidth>
-                    <InputLabel id="event-label">Event</InputLabel>
+                    <InputLabel id="limit-preset-label">Common cumulative limit</InputLabel>
                     <Select
-                      label="Event"
-                      labelId="event-label"
+                      label="Common cumulative limit"
+                      labelId="limit-preset-label"
                       onChange={(event) => {
+                        if (event.target.value === "custom") {
+                          setCustomLimit(true);
+                          return;
+                        }
+                        const minutes = Number(event.target.value);
+                        if (!Number.isFinite(minutes)) return;
+                        setCustomLimit(false);
                         const next = createCustomCalculatorState(
-                          event.target.value,
+                          undefined,
                           calculator.attempts.length,
-                          calculator.limitCentiseconds,
+                          minutes * 6_000,
                         );
                         next.perAttemptLimitCentiseconds =
                           calculator.perAttemptLimitCentiseconds;
                         requestReplacement(next);
                       }}
-                      value={customRound.eventId}
+                      value={
+                        isCustomLimit
+                          ? "custom"
+                          : String(calculator.limitCentiseconds / 6_000)
+                      }
                     >
-                      {timedEvents.map(([id, name]) => (
-                        <MenuItem key={id} value={id}>
-                          {name}
+                      {calculatorLimitPresets.map((minutes) => (
+                        <MenuItem key={minutes} value={minutes}>
+                          {minutes}:00
                         </MenuItem>
                       ))}
+                      <MenuItem value="custom">Custom limit</MenuItem>
                     </Select>
                   </FormControl>
                 </Grid>
@@ -208,7 +192,7 @@ export function CalculatorScreen() {
                       labelId="attempt-count-label"
                       onChange={(event) => {
                         const next = createCustomCalculatorState(
-                          customRound.eventId,
+                          undefined,
                           Number(event.target.value),
                           calculator.limitCentiseconds,
                         );
@@ -229,17 +213,19 @@ export function CalculatorScreen() {
               </>
             ) : null}
 
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <TimeSettingField
-                label="Cumulative limit"
-                onCommit={(limit) => {
-                  if (limit !== null) {
-                    updateLimits(limit, calculator.perAttemptLimitCentiseconds);
-                  }
-                }}
-                value={calculator.limitCentiseconds}
-              />
-            </Grid>
+            {isCustomLimit ? (
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TimeSettingField
+                  label="Custom cumulative limit"
+                  onCommit={(limit) => {
+                    if (limit !== null) {
+                      updateLimits(limit, calculator.perAttemptLimitCentiseconds);
+                    }
+                  }}
+                  value={calculator.limitCentiseconds}
+                />
+              </Grid>
+            ) : null}
             <Grid size={{ xs: 12, sm: 6 }}>
               <TimeSettingField
                 label="Per-attempt limit"
@@ -322,7 +308,6 @@ export function CalculatorScreen() {
 
       <Stack divider={<Divider flexItem />} spacing={3}>
         {orderedAttempts(calculator.attempts).map((attempt, index) => {
-          const round = calculator.rounds.find(({ roundId }) => roundId === attempt.roundId);
           const before = budgetBeforeAttempt(
             budget,
             attempt.roundId,
@@ -336,7 +321,7 @@ export function CalculatorScreen() {
               <AttemptInput
                 attempt={attempt}
                 capCentiseconds={Math.max(0, before.capForNextAttemptCentiseconds)}
-                label={`${round?.eventName ?? round?.eventId ?? "Event"} · attempt ${attempt.attemptNumber}`}
+                label={`Attempt ${attempt.attemptNumber}`}
                 onCommit={updateAttempt}
                 onMove={(direction) => {
                   const fields = document.querySelectorAll<HTMLInputElement>(
