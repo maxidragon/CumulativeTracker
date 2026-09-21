@@ -32,7 +32,10 @@ export type AttemptInputProps = {
 function inputValue(attempt: TrackedAttempt): string {
   return attempt.centiseconds === null
     ? ""
-    : formatTime(attempt.centiseconds, { compact: true });
+    : formatTime(attempt.centiseconds, {
+        compact: true,
+        preserveCentiseconds: true,
+      });
 }
 
 export function AttemptInput({

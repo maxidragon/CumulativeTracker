@@ -65,6 +65,18 @@ describe("CalculatorScreen", () => {
     expect(useCalculatorStore.getState().calculator.limitCentiseconds).toBe(360_000);
   });
 
+  it("accepts a custom number of attempts", async () => {
+    const user = userEvent.setup();
+    renderCalculator();
+    await user.click(screen.getByLabelText("Attempts"));
+    await user.click(screen.getByRole("option", { name: "Custom" }));
+    const custom = screen.getByLabelText("Custom attempts");
+    await user.clear(custom);
+    await user.type(custom, "12");
+    await user.keyboard("{Enter}");
+    expect(useCalculatorStore.getState().calculator.attempts).toHaveLength(12);
+  });
+
   it("confirms stop-at-limit before recording the DNF", async () => {
     const user = userEvent.setup();
     renderCalculator();

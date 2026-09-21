@@ -43,6 +43,12 @@ describe("calculator state", () => {
     );
   });
 
+  it("supports a custom number of attempts", () => {
+    const custom = createCustomCalculatorState(undefined, 12, 120_000);
+    expect(custom.attempts).toHaveLength(12);
+    expect(custom.rounds[0]?.format).toBe("a");
+  });
+
   it("drops invalid local storage instead of crashing", () => {
     localStorage.setItem(storageKeys.calculator, "not json");
     expect(readJson(storageKeys.calculator, isCalculatorState)).toBeNull();
