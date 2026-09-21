@@ -24,6 +24,8 @@ export type CalculatorPreset = {
   rounds: CalculatorRound[];
 };
 
+export const calculatorLimitPresets = [10, 12, 15, 20, 60, 90, 120] as const;
+
 export const timedEvents = [
   ["333", "3×3×3 Cube"],
   ["222", "2×2×2 Cube"],

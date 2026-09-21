@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { readJson, storageKeys, writeJson } from "../../lib/storage";
 import {
   calculatorPresets,
+  calculatorLimitPresets,
   decodeCalculatorState,
   defaultCalculatorState,
   encodeCalculatorState,
@@ -33,6 +34,13 @@ describe("calculator state", () => {
     const preset = calculatorPresets.find(({ id }) => id.includes("shared"));
     if (!preset) throw new Error("Shared preset is missing.");
     expect(stateFromPreset(preset).attempts).toHaveLength(6);
+  });
+
+  it("offers common cumulative-limit choices in minutes", () => {
+    expect(calculatorLimitPresets).toEqual([10, 12, 15, 20, 60, 90, 120]);
+    expect(createCustomCalculatorState(undefined, 3, 60 * 6_000).limitCentiseconds).toBe(
+      360_000,
+    );
   });
 
   it("drops invalid local storage instead of crashing", () => {

@@ -28,7 +28,7 @@ describe("CalculatorScreen", () => {
 
   it("updates remaining time from attempt entry and persists it", async () => {
     renderCalculator();
-    const input = screen.getByLabelText("3BLD · attempt 1");
+    const input = screen.getByLabelText("Attempt 1");
     for (const key of "60000") fireEvent.keyDown(input, { key });
     fireEvent.keyDown(input, { key: "Enter" });
 
@@ -43,18 +43,26 @@ describe("CalculatorScreen", () => {
 
   it("shows an upper bound when a DNF has no elapsed time", () => {
     renderCalculator();
-    fireEvent.keyDown(screen.getByLabelText("3BLD · attempt 1"), { key: "d" });
+    fireEvent.keyDown(screen.getByLabelText("Attempt 1"), { key: "d" });
     expect(screen.getByText(/1 DNF is missing elapsed time/i)).toBeInTheDocument();
     expect(screen.getAllByText("≤ 20:00")).toHaveLength(2);
     expect(screen.getByRole("button", { name: "Stopped at the limit" })).toBeDisabled();
   });
 
-  it("does not turn a preset into a custom setup when a limit field only blurs", () => {
+  it("keeps the saved setup when the common-limit selector only blurs", () => {
     renderCalculator();
-    const limit = screen.getByLabelText("Cumulative limit");
+    const limit = screen.getByLabelText("Common cumulative limit");
     fireEvent.focus(limit);
     fireEvent.blur(limit);
     expect(useCalculatorStore.getState().calculator.presetId).toBe("333bf-bo3-20");
+  });
+
+  it("changes the calculator to a common minute limit", async () => {
+    const user = userEvent.setup();
+    renderCalculator();
+    await user.click(screen.getByLabelText("Common cumulative limit"));
+    await user.click(screen.getByRole("option", { name: "60:00" }));
+    expect(useCalculatorStore.getState().calculator.limitCentiseconds).toBe(360_000);
   });
 
   it("confirms stop-at-limit before recording the DNF", async () => {
