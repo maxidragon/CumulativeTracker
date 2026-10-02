@@ -146,6 +146,13 @@ export function createCustomCalculatorState(
   };
 }
 
+/** Empties every attempt and keeps the setup: limit, per-attempt limit, rounds, attempt count. */
+export function clearCalculatorAttempts(state: CalculatorState): CalculatorState {
+  const customAttemptCount =
+    state.rounds[0]?.format === "a" ? state.attempts.length : undefined;
+  return { ...state, attempts: createAttempts(state.rounds, customAttemptCount) };
+}
+
 const defaultPreset = calculatorPresets[0];
 if (!defaultPreset) throw new Error("At least one calculator preset is required.");
 export const defaultCalculatorState = stateFromPreset(defaultPreset);

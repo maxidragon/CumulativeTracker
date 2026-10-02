@@ -3,6 +3,7 @@ import { readJson, storageKeys, writeJson } from "../../lib/storage";
 import {
   calculatorPresets,
   calculatorLimitPresets,
+  clearCalculatorAttempts,
   decodeCalculatorState,
   defaultCalculatorState,
   encodeCalculatorState,
@@ -14,6 +15,23 @@ import {
 afterEach(() => localStorage.clear());
 
 describe("calculator state", () => {
+  it("clears attempts without changing a custom count or a multi-event setup", () => {
+    const custom = createCustomCalculatorState("333bf", 7, 90_000);
+    const shared = calculatorPresets.find(({ rounds }) => rounds.length > 1);
+    if (!shared) throw new Error("Expected a multi-event preset.");
+    for (const state of [custom, stateFromPreset(shared)]) {
+      const entered = {
+        ...state,
+        attempts: state.attempts.map((attempt) => ({
+          ...attempt,
+          outcome: "ok" as const,
+          centiseconds: 3_000,
+        })),
+      };
+      expect(clearCalculatorAttempts(entered)).toEqual(state);
+    }
+  });
+
   it("round-trips shareable URL state", () => {
     const encoded = encodeCalculatorState(defaultCalculatorState);
     expect(decodeCalculatorState(encoded)).toEqual(defaultCalculatorState);

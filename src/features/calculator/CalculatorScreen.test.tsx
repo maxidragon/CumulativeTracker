@@ -88,6 +88,29 @@ describe("CalculatorScreen", () => {
     await user.click(screen.getByRole("button", { name: "Cancel" }));
   });
 
+  it("resets entered attempts after confirmation and keeps the setup", async () => {
+    const user = userEvent.setup();
+    renderCalculator();
+    const reset = screen.getByRole("button", { name: "Reset" });
+    expect(reset).toBeDisabled();
+
+    await user.click(screen.getByLabelText("Cumulative limit"));
+    await user.click(screen.getByRole("option", { name: "60:00" }));
+    const input = screen.getByLabelText("Attempt 1");
+    for (const key of "60000") fireEvent.keyDown(input, { key });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    await user.click(reset);
+    expect(screen.getByRole("dialog")).toHaveTextContent("This clears 1 entered attempt.");
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Reset" }));
+
+    const { calculator } = useCalculatorStore.getState();
+    expect(calculator.attempts.every(({ outcome }) => outcome === "skipped")).toBe(true);
+    expect(calculator.attempts).toHaveLength(3);
+    expect(calculator.limitCentiseconds).toBe(360_000);
+    expect(screen.getByLabelText("Attempt 1")).toHaveValue("");
+  });
+
   it("encodes the current state for a shareable URL", async () => {
     renderCalculator();
     const encoded = encodeCalculatorState(defaultCalculatorState);

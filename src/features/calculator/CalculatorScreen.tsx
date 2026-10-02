@@ -1,3 +1,4 @@
+import { RestartAlt } from "@mui/icons-material";
 import {
   Alert,
   Box,
@@ -31,6 +32,7 @@ import {
 import { AttemptInput } from "../entry/AttemptInput";
 import {
   calculatorLimitPresets,
+  clearCalculatorAttempts,
   createCustomCalculatorState,
   encodeCalculatorState,
   type CalculatorState,
@@ -40,8 +42,16 @@ import { TimeSettingField } from "./TimeSettingField";
 
 type PendingAction =
   | { kind: "replace"; state: CalculatorState; description: string }
+  | { kind: "reset"; description: string }
   | { kind: "stop"; roundId: string; attemptNumber: number; description: string }
   | { kind: "dns"; roundId: string; description: string };
+
+const dialogText: Record<PendingAction["kind"], { title: string; confirm: string }> = {
+  replace: { title: "Change calculator setup?", confirm: "Clear and change" },
+  reset: { title: "Reset the calculator?", confirm: "Reset" },
+  stop: { title: "Stop this attempt at the limit?", confirm: "Record DNF" },
+  dns: { title: "DNS the remaining attempts?", confirm: "Mark DNS" },
+};
 
 export function CalculatorScreen() {
   const calculator = useCalculatorStore((state) => state.calculator);
@@ -125,6 +135,8 @@ export function CalculatorScreen() {
     if (!pendingAction) return;
     if (pendingAction.kind === "replace") {
       replaceCalculator(pendingAction.state);
+    } else if (pendingAction.kind === "reset") {
+      replaceCalculator(clearCalculatorAttempts(calculator));
     } else if (pendingAction.kind === "stop") {
       replaceCalculator({
         ...calculator,
@@ -397,27 +409,28 @@ export function CalculatorScreen() {
         >
           DNS the rest
         </Button>
+        <Box sx={{ flexGrow: 1 }} />
+        <Button
+          disabled={enteredCount === 0}
+          onClick={() =>
+            setPendingAction({
+              kind: "reset",
+              description: `This clears ${enteredCount} entered attempt${enteredCount === 1 ? "" : "s"}. The limit and the number of attempts stay as they are.`,
+            })
+          }
+          startIcon={<RestartAlt />}
+        >
+          Reset
+        </Button>
       </Stack>
 
       <ConfirmActionDialog
-        confirmLabel={
-          pendingAction?.kind === "replace"
-            ? "Clear and change"
-            : pendingAction?.kind === "stop"
-              ? "Record DNF"
-              : "Mark DNS"
-        }
+        confirmLabel={pendingAction ? dialogText[pendingAction.kind].confirm : ""}
         description={pendingAction?.description ?? ""}
         onCancel={() => setPendingAction(null)}
         onConfirm={runPendingAction}
         open={pendingAction !== null}
-        title={
-          pendingAction?.kind === "replace"
-            ? "Change calculator setup?"
-            : pendingAction?.kind === "stop"
-              ? "Stop this attempt at the limit?"
-              : "DNS the remaining attempts?"
-        }
+        title={pendingAction ? dialogText[pendingAction.kind].title : ""}
       />
     </Stack>
   );

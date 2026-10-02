@@ -119,6 +119,10 @@ The limit is picked from common announcements (10, 12, 15, 20, 60, 90 or 120 min
 as a custom limit; the attempts count is 1, 2, 3, 5 or a custom count. Presets are a
 convenience, never a claim about what a competition announced.
 
+`Reset`, below the attempts, empties every attempt for the next competitor and keeps the setup
+(limit, per-attempt limit, attempts count). It asks for confirmation and is disabled while no
+attempt is entered.
+
 ## Group workspace
 
 The scoretaker's screen, laid out for a laptop first. The board and the competitor view are
