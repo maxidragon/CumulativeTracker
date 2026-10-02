@@ -64,8 +64,10 @@ Behaviour:
 - The time field copies WCA Live's input exactly, because scoretakers already have it in their
   fingers and a second, different time input at the same competition causes errors. Modelled on
   `wca-live`'s `client/src/components/admin/AttemptResultField/TimeField.jsx`:
-  `<input type="tel">`, digits only, filled **right to left** — typing `12345` shows `2:03.45`,
-  formatted `hh:mm:ss.cc` with leading zeros and colons stripped.
+  `<input type="tel">`, digits only, filled **right to left** into the `hh:mm:ss.cc` slots —
+  typing `25000` shows `2:50.00` and `12345` shows `1:23.45` — with leading zeros and colons
+  stripped. Digits are slots, not a count of centiseconds. A slot may overflow as it can in
+  WCA Live (`9999` is 99.99 seconds, committed as `1:39.99`), and input stops at eight digits.
 - **DNF** is a tickbox beside the field. Ticking it does not clear or disable the time; the
   field keeps the elapsed time and the helper text changes to `counts 10:00 towards the limit`.
   The WCA Live keys `d`, `D`, `/` and `#` toggle the tickbox from inside the field, so the

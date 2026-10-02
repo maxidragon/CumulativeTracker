@@ -12,6 +12,7 @@ import {
   autocompleteTime,
   formatTime,
   formatTimeInput,
+  parseTimeDraft,
   parseTimeInput,
   type Outcome,
   type TrackedAttempt,
@@ -64,7 +65,7 @@ export function AttemptInput({
     value = draftInput,
     estimated = draftEstimated,
   ) => {
-    const parsed = outcome === "dns" ? null : parseTimeInput(value);
+    const parsed = outcome === "dns" ? null : parseTimeDraft(value);
     const centiseconds = parsed === null ? null : autocompleteTime(parsed);
     let committedOutcome: Outcome = outcome;
 
@@ -90,7 +91,7 @@ export function AttemptInput({
   const toggleDnf = () => {
     const nextOutcome: Outcome =
       draftOutcome === "dnf"
-        ? parseTimeInput(draftInput) === null
+        ? parseTimeDraft(draftInput) === null
           ? "skipped"
           : "ok"
         : "dnf";
@@ -110,12 +111,14 @@ export function AttemptInput({
     }
   };
 
+  const draftDigits = draftInput.replace(/\D/g, "");
+
   const appendDigits = (digits: string) => {
-    const current = parseTimeInput(draftInput) ?? 0;
-    const next = Number(`${current}${digits}`);
-    setDraftInput(next === 0 ? "" : formatTime(next, { preserveCentiseconds: true }));
+    setDraftInput(formatTimeInput(`${draftDigits}${digits}`));
     if (draftOutcome === "skipped") setDraftOutcome("ok");
   };
+
+  const removeLastDigit = () => setDraftInput(formatTimeInput(draftDigits.slice(0, -1)));
 
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (DNF_KEYS.has(event.key)) {
@@ -135,9 +138,7 @@ export function AttemptInput({
     }
     if (event.key === "Backspace") {
       event.preventDefault();
-      const current = parseTimeInput(draftInput) ?? 0;
-      const next = Math.floor(current / 10);
-      setDraftInput(next === 0 ? "" : formatTime(next, { preserveCentiseconds: true }));
+      removeLastDigit();
       return;
     }
     if (event.key === "Enter") {
@@ -157,9 +158,7 @@ export function AttemptInput({
   const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
     const nativeEvent = event.nativeEvent as InputEvent;
     if (nativeEvent.inputType === "deleteContentBackward") {
-      const current = parseTimeInput(draftInput) ?? 0;
-      const next = Math.floor(current / 10);
-      setDraftInput(next === 0 ? "" : formatTime(next, { preserveCentiseconds: true }));
+      removeLastDigit();
       return;
     }
     if (nativeEvent.data && /^\d+$/.test(nativeEvent.data)) {
@@ -175,7 +174,7 @@ export function AttemptInput({
     );
   };
 
-  const elapsed = parseTimeInput(draftInput);
+  const elapsed = parseTimeDraft(draftInput);
   const isOverCap =
     capCentiseconds !== undefined && elapsed !== null && elapsed > capCentiseconds;
   const helperText =

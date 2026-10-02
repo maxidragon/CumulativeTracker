@@ -29,7 +29,7 @@ describe("CalculatorScreen", () => {
   it("updates remaining time from attempt entry and persists it", async () => {
     renderCalculator();
     const input = screen.getByLabelText("Attempt 1");
-    for (const key of "60000") fireEvent.keyDown(input, { key });
+    for (const key of "100000") fireEvent.keyDown(input, { key });
     fireEvent.keyDown(input, { key: "Enter" });
 
     const remainingCard = screen.getByText("Remaining").parentElement;

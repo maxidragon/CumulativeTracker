@@ -20,12 +20,12 @@ describe("AttemptInput", () => {
     render(<AttemptInput attempt={skippedAttempt} onCommit={onCommit} onMove={onMove} />);
     const input = screen.getByLabelText("Attempt 2");
 
-    for (const key of "12345") fireEvent.keyDown(input, { key });
-    expect(input).toHaveValue("2:03.45");
+    for (const key of "25000") fireEvent.keyDown(input, { key });
+    expect(input).toHaveValue("2:50.00");
 
     fireEvent.keyDown(input, { key: "Enter" });
     expect(onCommit).toHaveBeenLastCalledWith(
-      expect.objectContaining({ outcome: "ok", centiseconds: 12_345 }),
+      expect.objectContaining({ outcome: "ok", centiseconds: 17_000 }),
     );
     expect(onMove).toHaveBeenCalledWith("next");
   });
@@ -65,7 +65,7 @@ describe("AttemptInput", () => {
     const onCommit = vi.fn();
     render(<AttemptInput attempt={skippedAttempt} onCommit={onCommit} />);
     const input = screen.getByLabelText("Attempt 2");
-    for (const key of "60000") fireEvent.keyDown(input, { key });
+    for (const key of "100000") fireEvent.keyDown(input, { key });
     fireEvent.keyDown(input, { key: "d" });
 
     expect(onCommit).toHaveBeenLastCalledWith(
@@ -78,11 +78,32 @@ describe("AttemptInput", () => {
     const onCommit = vi.fn();
     render(<AttemptInput attempt={skippedAttempt} onCommit={onCommit} />);
     const input = screen.getByLabelText("Attempt 2");
-    for (const key of "60047") fireEvent.keyDown(input, { key });
+    for (const key of "100047") fireEvent.keyDown(input, { key });
     fireEvent.blur(input);
     expect(onCommit).toHaveBeenLastCalledWith(
       expect.objectContaining({ outcome: "ok", centiseconds: 60_000 }),
     );
+  });
+
+  it("removes the last typed digit with Backspace", () => {
+    render(<AttemptInput attempt={skippedAttempt} onCommit={vi.fn()} />);
+    const input = screen.getByLabelText("Attempt 2");
+    for (const key of "25000") fireEvent.keyDown(input, { key });
+    fireEvent.keyDown(input, { key: "Backspace" });
+    expect(input).toHaveValue("25.00");
+  });
+
+  it("commits an overflowing slot as its real time", () => {
+    const onCommit = vi.fn();
+    render(<AttemptInput attempt={skippedAttempt} onCommit={onCommit} />);
+    const input = screen.getByLabelText("Attempt 2");
+    for (const key of "9999") fireEvent.keyDown(input, { key });
+    expect(input).toHaveValue("99.99");
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(onCommit).toHaveBeenLastCalledWith(
+      expect.objectContaining({ outcome: "ok", centiseconds: 9_999 }),
+    );
+    expect(input).toHaveValue("1:39.99");
   });
 
   it("reverts a draft with Escape and moves backwards with Shift+Enter", () => {
