@@ -595,7 +595,7 @@ export function CompetitorScreen() {
                 ? `Every locally tracked attempt for ${person.name} in this group will be cleared.`
                 : pendingAction === "dns"
                   ? `Every skipped attempt remaining in ${group.rounds.find(({ roundId }) => roundId === nextAttempt?.roundId)?.eventName ?? "this round"} will be marked DNS. Other rounds are unchanged.`
-                  : `The next attempt will be recorded as DNF at exactly ${formatTime(group.cumulative ? summary.remainingCentiseconds : group.limitCentiseconds, { compact: true })}.`
+                  : `The next attempt will be recorded as DNF at exactly ${formatTime(group.cumulative ? Math.max(0, summary.remainingCentiseconds) : group.limitCentiseconds, { compact: true })}.`
             }
             onCancel={() => setPendingAction(null)}
             onConfirm={confirmAction}
