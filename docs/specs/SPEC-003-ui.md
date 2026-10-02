@@ -95,9 +95,10 @@ on what happened.
 
 ## Calculator
 
-One column, large type, no chrome. Event selector (for result formatting), attempts count or a
-round preset, the cumulative limit, then the attempts. Below them, the answer block shared with
-every other screen:
+One narrow column (at most ~760px, however wide the screen), no chrome. One row of settings —
+the cumulative limit, the attempts count, the optional per-attempt limit — then the answer
+block, then the attempts, one compact line each. The answer block is the same figures every
+screen shows:
 
 ```
          REMAINING              NEXT ATTEMPT CAP
@@ -105,9 +106,9 @@ every other screen:
      used 14:47.66 of 20:00      2 attempts left · avg 2:36 each
 ```
 
-Presets cover the common announcements: 3BLD bo3 20:00 · 3BLD mo3 30:00 · 4BLD 60:00 ·
-5BLD 60:00 · 4BLD+5BLD 60:00 shared. Presets are a convenience, never a claim about what a
-competition announced.
+The limit is picked from common announcements (10, 12, 15, 20, 60, 90 or 120 minutes) or typed
+as a custom limit; the attempts count is 1, 2, 3, 5 or a custom count. Presets are a
+convenience, never a claim about what a competition announced.
 
 ## Group workspace
 

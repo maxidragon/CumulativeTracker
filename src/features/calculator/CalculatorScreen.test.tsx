@@ -51,7 +51,7 @@ describe("CalculatorScreen", () => {
 
   it("keeps the saved setup when the common-limit selector only blurs", () => {
     renderCalculator();
-    const limit = screen.getByLabelText("Common cumulative limit");
+    const limit = screen.getByLabelText("Cumulative limit");
     fireEvent.focus(limit);
     fireEvent.blur(limit);
     expect(useCalculatorStore.getState().calculator.presetId).toBe("333bf-bo3-20");
@@ -60,7 +60,7 @@ describe("CalculatorScreen", () => {
   it("changes the calculator to a common minute limit", async () => {
     const user = userEvent.setup();
     renderCalculator();
-    await user.click(screen.getByLabelText("Common cumulative limit"));
+    await user.click(screen.getByLabelText("Cumulative limit"));
     await user.click(screen.getByRole("option", { name: "60:00" }));
     expect(useCalculatorStore.getState().calculator.limitCentiseconds).toBe(360_000);
   });
