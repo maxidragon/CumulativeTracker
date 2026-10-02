@@ -30,7 +30,7 @@ type CompetitorPanelProps = {
   /** Bump to put the cursor on the next empty attempt again, e.g. for the same competitor. */
   focusRequest: number;
   closeTo: string;
-  /** Enter on the last attempt: the scorecard is done. */
+  /** Enter on the last attempt, or Escape on an unchanged one: back to the competitor search. */
   onDone: () => void;
 };
 
@@ -57,6 +57,8 @@ export function CompetitorPanel({
   const attemptsRef = useRef<HTMLDivElement>(null);
   const [dragFrom, setDragFrom] = useState<number | null>(null);
   const [dropTarget, setDropTarget] = useState<number | null>(null);
+  const refocusKey = useRef<string | null>(null);
+  const orderSignature = ordered.map(attemptKey).join(",");
   const nextKey = nextAttempt ? attemptKey(nextAttempt) : null;
 
   const attemptFields = () =>
@@ -75,6 +77,17 @@ export function CompetitorPanel({
     // changes the next attempt) must not, or Enter-to-advance would fight it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusRequest, person.registrantId]);
+
+  // Reordering moves the row's DOM node, which drops focus; put it back on the moved attempt.
+  useEffect(() => {
+    if (refocusKey.current === null) return;
+    attemptsRef.current
+      ?.querySelector<HTMLInputElement>(
+        `[data-attempt-key="${refocusKey.current}"] input[type='tel']`,
+      )
+      ?.focus();
+    refocusKey.current = null;
+  }, [orderSignature]);
 
   const limitNote = summary.isUpperBound && group.cumulative ? "≤ " : "";
   const nextRound = group.rounds.find(({ roundId }) => roundId === nextAttempt?.roundId);
@@ -178,7 +191,7 @@ export function CompetitorPanel({
           </Typography>
           <Typography color="text.secondary" variant="body2">
             The shared limit is spent in this order. If the competitor did them differently,
-            drag an attempt by its handle or use the arrows.
+            drag an attempt by its handle, use the arrows, or press Alt+↑ / Alt+↓ in its field.
           </Typography>
         </Box>
       ) : null}
@@ -268,13 +281,22 @@ export function CompetitorPanel({
                       : `Attempt ${attempt.attemptNumber}`
                   }
                   onCommit={entry.commitAttempt}
-                  onMove={(direction) => {
-                    if (direction === "next" && index === ordered.length - 1) {
+                  onExit={onDone}
+                  onMove={(direction, via) => {
+                    if (via === "enter" && direction === "next" && index === ordered.length - 1) {
                       onDone();
                       return;
                     }
                     attemptFields()[index + (direction === "next" ? 1 : -1)]?.focus();
                   }}
+                  onReorder={
+                    multiRound
+                      ? (direction) => {
+                          entry.moveAttempt(index, index + (direction === "earlier" ? -1 : 1));
+                          refocusKey.current = attemptKey(attempt);
+                        }
+                      : undefined
+                  }
                 />
                 {liveToken && attempt.outcome !== "skipped" ? (
                   <AttemptSync
@@ -293,7 +315,8 @@ export function CompetitorPanel({
                     aria-label={`Move ${eventName} attempt ${attempt.attemptNumber} earlier`}
                     disabled={index === 0}
                     onClick={() => entry.moveAttempt(index, index - 1)}
-                    title="Done earlier"
+                    tabIndex={-1}
+                    title="Done earlier (Alt+↑ in the field)"
                   >
                     <ArrowUpward />
                   </IconButton>
@@ -301,7 +324,8 @@ export function CompetitorPanel({
                     aria-label={`Move ${eventName} attempt ${attempt.attemptNumber} later`}
                     disabled={index === ordered.length - 1}
                     onClick={() => entry.moveAttempt(index, index + 1)}
-                    title="Done later"
+                    tabIndex={-1}
+                    title="Done later (Alt+↓ in the field)"
                   >
                     <ArrowDownward />
                   </IconButton>

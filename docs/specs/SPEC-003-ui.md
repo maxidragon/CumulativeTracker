@@ -80,13 +80,22 @@ Behaviour:
   It shows as `elapsed time not recorded`, and it turns the competitor's remaining budget into
   an upper bound until somebody fills it in
   ([A1a2+++](https://www.worldcubeassociation.org/regulations/#A1a2)). An `estimated` toggle
-  marks a Delegate's estimate.
+  marks a Delegate's estimate; `e` toggles it from the field.
 - An empty time with nothing ticked is a skipped attempt, not a zero.
-- On commit (blur or Enter) the time is autocompleted: 10 minutes or more truncates to whole
+- On commit (blur, Enter or an arrow key) the time is autocompleted: 10 minutes or more truncates to whole
   seconds ([9f2](https://www.worldcubeassociation.org/regulations/#9f2)). Unparseable input
   resets to empty rather than guessing.
-- `Enter` commits and moves to the next attempt; `Shift+Enter` moves back; `Escape` reverts the
-  field to its committed value; `Space` toggles DNF when the tickbox has focus.
+  Committing an attempt that did not change is a no-op: it keeps its timestamp and is not sent
+  to WCA Live again, so moving through filled fields is safe.
+- Moving between attempts works as in WCA Live — the cursor goes field to field:
+  - `Enter` commits and moves to the next attempt; `Shift+Enter` moves back.
+  - `↓` and `↑` commit and move to the next or previous attempt, stopping at either end.
+  - `Tab` goes to the next attempt field. The DNF, DNS and estimated tickboxes are left out of
+    the tab order because `d`, `s` and `e` toggle them from the field; they stay clickable.
+  - `Escape` reverts unsaved typing; pressed again (nothing left to revert) it leaves the
+    scorecard for the competitor search.
+  - In groups that span several events, `Alt+↑` and `Alt+↓` move the attempt earlier or later
+    in the order it was done, and the cursor stays on it.
 - In modes where the cumulative budget is tracked, each field shows the cap that applied to that
   attempt and warns — amber helper text, never a block — when the entered time exceeds it.
 
@@ -127,13 +136,17 @@ Entering a stack of scorecards should never need the mouse:
 
 1. `/` focuses the competitor search from anywhere outside a field.
 2. Type a registrant id (or part of a name) and press `Enter`. An exact registrant id wins;
-   otherwise the first row of the filtered table. The search clears and the panel opens.
+   otherwise the first row of the filtered table. `↓` and `↑` pick a row instead (it is
+   outlined in the table and scrolled into view), and `Enter` opens that one. The search clears
+   and the panel opens.
 3. The cursor lands on that competitor's **next empty attempt**, not the first one, so a
    scorecard that comes back for its third attempt continues where it stopped.
 4. `Enter` commits each attempt and moves to the next ([attempt input](#the-attempt-input)).
    `Enter` on the last attempt returns the cursor to the search, ready for the next scorecard.
 
-`Escape` in the search clears it.
+`Escape` in the search clears it, and `Escape` in an attempt field with nothing to revert
+returns to the search. `?` outside a field — or the `Shortcuts` button above the table — lists
+every shortcut.
 
 ### Table
 
@@ -175,7 +188,7 @@ When the group spans several events the order the attempts were *done* decides h
 runs out ([A1a2++++++](https://www.worldcubeassociation.org/regulations/#A1a2)), so the panel
 says so above the list and makes the sequence explicit: every attempt carries a numbered badge
 (its place in the sequence), the event icon, a drag handle, and "done earlier" / "done later"
-buttons. Fields are labelled by event id (`444bf · attempt 1`). A single-event group has only
+buttons, which `Alt+↑` / `Alt+↓` press from the field. Fields are labelled by event id (`444bf · attempt 1`). A single-event group has only
 one possible order, shows none of this, and labels fields `Attempt 1`.
 
 Destructive or regulation-bearing actions — "stopped at the limit", "DNS the rest", clearing a
@@ -201,7 +214,9 @@ attempts sit as `Local` and can be sent when the connection is back.
 - **Type scale**: the two numbers that matter (remaining, next cap) are at least `h3` on
   desktop and `h4` on mobile, tabular figures, so they do not reflow as digits change.
 - **Touch targets** are at least 44px; the attempt fields on mobile are full-width.
-- **Accessibility**: every interactive element is reachable and operable by keyboard; status is
+- **Accessibility**: every interactive element is reachable and operable by keyboard — the
+  attempt tickboxes and reorder arrows through their keys in the field (declared with
+  `aria-keyshortcuts`) rather than as tab stops; status is
   conveyed by icon + text as well as colour; live-updating numbers are announced politely via
   `aria-live` on the remaining-budget block, not on every keystroke.
 - **Offline shell**: the app renders and works for calculator and local modes without a network

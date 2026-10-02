@@ -150,6 +150,38 @@ describe("local competition flow", () => {
     expect(search).toHaveFocus();
   });
 
+  it("picks a search match with the arrow keys and returns to the search with Escape", async () => {
+    const user = userEvent.setup();
+    renderFlow();
+    const search = screen.getByLabelText("Find competitor (registrant id or name)");
+    await user.click(search);
+    await user.keyboard("example{ArrowDown}");
+    expect(
+      screen.getByRole("row", { current: true, name: /Example Competitor/ }),
+    ).toBeInTheDocument();
+    await user.keyboard("{Enter}");
+
+    const first = await screen.findByLabelText("Attempt 1");
+    expect(first).toHaveFocus();
+    await user.keyboard("{ArrowDown}");
+    expect(screen.getByLabelText("Attempt 2")).toHaveFocus();
+    await user.keyboard("{Escape}");
+    expect(search).toHaveFocus();
+  });
+
+  it("lists the shortcuts when ? is pressed outside a field", async () => {
+    const user = userEvent.setup();
+    renderFlow();
+    // Focus a real element first: from the bare body, user-event hands MUI's focus trap a
+    // non-element to restore focus to.
+    screen.getByRole("button", { name: /Shortcuts/ }).focus();
+    await user.keyboard("?");
+    const dialog = screen.getByRole("dialog", { name: "Keyboard shortcuts" });
+    expect(dialog).toHaveTextContent("Toggle estimated");
+    await user.click(within(dialog).getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(dialog).not.toBeInTheDocument());
+  });
+
   it("keeps the scorecard usable when an attempt overruns the whole budget", async () => {
     const user = userEvent.setup();
     renderFlow("/c/InventedOpen2026/g/333bf-r1/7");
@@ -177,6 +209,12 @@ describe("local competition flow", () => {
     );
 
     expect(sequence().slice(2, 4)).toEqual(["555bf-r1:1", "444bf-r1:3"]);
+
+    const moved = screen.getByLabelText("555bf · attempt 1");
+    await user.click(moved);
+    await user.keyboard("{Alt>}{ArrowDown}{/Alt}");
+    expect(sequence().slice(2, 4)).toEqual(["444bf-r1:3", "555bf-r1:1"]);
+    expect(moved).toHaveFocus();
   });
 
   it("submits a committed attempt immediately in WCA Live mode", async () => {
