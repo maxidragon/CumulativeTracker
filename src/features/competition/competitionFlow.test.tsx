@@ -105,7 +105,7 @@ describe("local competition flow", () => {
 
     const attempt = screen.getByLabelText("3x3x3 Blindfolded · attempt 1");
     await user.click(attempt);
-    await user.keyboard("60000{Enter}");
+    await user.keyboard("100000{Enter}");
 
     const capCard = screen.getByText("Next attempt cap").parentElement;
     if (!capCard) throw new Error("Cap card was not rendered.");
@@ -170,7 +170,7 @@ describe("local competition flow", () => {
     const user = userEvent.setup();
     const input = await screen.findByLabelText("3x3x3 Blindfolded · attempt 1");
     await user.click(input);
-    await user.keyboard("60000{Enter}");
+    await user.keyboard("100000{Enter}");
 
     await waitFor(() => {
       expect(
