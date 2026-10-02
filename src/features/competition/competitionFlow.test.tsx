@@ -47,7 +47,7 @@ const wcif = {
   ],
 } as unknown as Competition;
 
-function renderFlow() {
+function renderFlow(initialEntry = "/c/InventedOpen2026/g/333bf-r1") {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
   });
@@ -58,7 +58,7 @@ function renderFlow() {
   });
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={["/c/InventedOpen2026/g/333bf-r1"]}>
+      <MemoryRouter initialEntries={[initialEntry]}>
         <Routes>
           <Route
             element={<CompetitionBoardScreen />}
@@ -113,6 +113,18 @@ describe("local competition flow", () => {
     expect(localStorage.getItem("ct:v1:budgets:InventedOpen2026")).toContain(
       '"centiseconds":60000',
     );
+  });
+
+  it("keeps the scorecard usable when an attempt overruns the whole budget", async () => {
+    const user = userEvent.setup();
+    renderFlow("/c/InventedOpen2026/g/333bf-r1/7");
+    const attempt = await screen.findByLabelText("3x3x3 Blindfolded · attempt 1");
+    await user.click(attempt);
+    await user.keyboard("250000{Enter}");
+
+    expect(
+      await screen.findByText("The cumulative limit is exhausted."),
+    ).toBeInTheDocument();
   });
 
   it("submits a committed attempt immediately in WCA Live mode", async () => {
