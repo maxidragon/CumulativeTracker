@@ -27,7 +27,7 @@ describe("AttemptInput", () => {
     expect(onCommit).toHaveBeenLastCalledWith(
       expect.objectContaining({ outcome: "ok", centiseconds: 17_000 }),
     );
-    expect(onMove).toHaveBeenCalledWith("next");
+    expect(onMove).toHaveBeenCalledWith("next", "enter");
   });
 
   it("keeps explicit zero centiseconds in an entered time", () => {
@@ -115,7 +115,62 @@ describe("AttemptInput", () => {
     fireEvent.keyDown(input, { key: "Escape" });
     expect(input).toHaveValue("");
     fireEvent.keyDown(input, { key: "Enter", shiftKey: true });
-    expect(onMove).toHaveBeenCalledWith("previous");
+    expect(onMove).toHaveBeenCalledWith("previous", "enter");
+  });
+
+  it("moves with the arrow keys without recommitting an unchanged attempt", () => {
+    const onCommit = vi.fn();
+    const onMove = vi.fn();
+    render(
+      <AttemptInput
+        attempt={{ ...skippedAttempt, outcome: "ok", centiseconds: 6_000 }}
+        onCommit={onCommit}
+        onMove={onMove}
+      />,
+    );
+    const input = screen.getByLabelText("Attempt 2");
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    expect(onMove).toHaveBeenLastCalledWith("next", "arrow");
+    fireEvent.keyDown(input, { key: "ArrowUp" });
+    expect(onMove).toHaveBeenLastCalledWith("previous", "arrow");
+    fireEvent.blur(input);
+    expect(onCommit).not.toHaveBeenCalled();
+  });
+
+  it("toggles estimated with E and reorders with Alt+arrows", () => {
+    const onCommit = vi.fn();
+    const onReorder = vi.fn();
+    render(
+      <AttemptInput attempt={skippedAttempt} onCommit={onCommit} onReorder={onReorder} />,
+    );
+    const input = screen.getByLabelText("Attempt 2");
+    for (const key of "6000") fireEvent.keyDown(input, { key });
+    fireEvent.keyDown(input, { key: "e" });
+    expect(onCommit).toHaveBeenLastCalledWith(
+      expect.objectContaining({ centiseconds: 6_000, estimated: true }),
+    );
+    fireEvent.keyDown(input, { key: "ArrowUp", altKey: true });
+    expect(onReorder).toHaveBeenCalledWith("earlier");
+    fireEvent.keyDown(input, { key: "ArrowDown", altKey: true });
+    expect(onReorder).toHaveBeenLastCalledWith("later");
+  });
+
+  it("leaves the field with Escape once there is nothing to revert", () => {
+    const onExit = vi.fn();
+    render(<AttemptInput attempt={skippedAttempt} onCommit={vi.fn()} onExit={onExit} />);
+    const input = screen.getByLabelText("Attempt 2");
+    fireEvent.keyDown(input, { key: "1" });
+    fireEvent.keyDown(input, { key: "Escape" });
+    expect(onExit).not.toHaveBeenCalled();
+    fireEvent.keyDown(input, { key: "Escape" });
+    expect(onExit).toHaveBeenCalledOnce();
+  });
+
+  it("keeps the tickboxes out of the tab order so Tab goes field to field", () => {
+    render(<AttemptInput attempt={skippedAttempt} onCommit={vi.fn()} />);
+    for (const name of ["DNF", "DNS", "Estimated"]) {
+      expect(screen.getByRole("checkbox", { name })).toHaveAttribute("tabindex", "-1");
+    }
   });
 
   it("warns without blocking a time over the cap", () => {

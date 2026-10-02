@@ -19,7 +19,7 @@ import {
   Typography,
 } from "@mui/material";
 import type { Person } from "@wca/helpers";
-import type { ReactElement } from "react";
+import { useEffect, useRef, type ReactElement } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { formatTime } from "../../lib/attempt";
 import { attemptsForFormat, type Budget, type BudgetSummary } from "../../lib/cumulative";
@@ -74,6 +74,8 @@ type CompetitorTableProps = {
   rounds: CompetitionRound[];
   liveMode: boolean;
   selectedRegistrantId: number | null;
+  /** Picked with ↑/↓ in the search, not opened yet. */
+  highlightedRegistrantId: number | null;
   linkTo: (registrantId: number) => string;
 };
 
@@ -90,9 +92,14 @@ export function CompetitorTable({
   rounds,
   liveMode,
   selectedRegistrantId,
+  highlightedRegistrantId,
   linkTo,
 }: CompetitorTableProps) {
   const navigate = useNavigate();
+  const highlightedRef = useRef<HTMLTableRowElement>(null);
+  useEffect(() => {
+    highlightedRef.current?.scrollIntoView({ block: "nearest" });
+  }, [highlightedRegistrantId]);
   const multiRound = rounds.length > 1;
   const columns = rounds.map((round) => ({
     round,
@@ -178,13 +185,21 @@ export function CompetitorTable({
             {rows.map((row) => {
               const { person, budget, status } = row;
               const sync = budgetSyncLabel(budget);
+              const highlighted = person.registrantId === highlightedRegistrantId;
               return (
                 <TableRow
+                  aria-current={highlighted ? "true" : undefined}
                   hover
                   key={person.registrantId}
                   onClick={() => void navigate(linkTo(person.registrantId))}
+                  ref={highlighted ? highlightedRef : undefined}
                   selected={person.registrantId === selectedRegistrantId}
-                  sx={{ cursor: "pointer" }}
+                  sx={{
+                    cursor: "pointer",
+                    ...(highlighted
+                      ? { outline: 2, outlineColor: "primary.main", outlineOffset: -2 }
+                      : {}),
+                  }}
                 >
                   <TableCell align="right" sx={numeric}>
                     {person.registrantId}
