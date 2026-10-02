@@ -5,6 +5,8 @@ import {
   FormHelperText,
   Stack,
   TextField,
+  useMediaQuery,
+  useTheme,
 } from "@mui/material";
 import type { ChangeEvent, KeyboardEvent } from "react";
 import { useState } from "react";
@@ -47,6 +49,9 @@ export function AttemptInput({
   onCommit,
   onMove,
 }: AttemptInputProps) {
+  const theme = useTheme();
+  const dense = useMediaQuery(theme.breakpoints.up("md"));
+  const size = dense ? "small" : "medium";
   const [draftInput, setDraftInput] = useState(() => inputValue(attempt));
   const [draftOutcome, setDraftOutcome] = useState(attempt.outcome);
   const [draftEstimated, setDraftEstimated] = useState(attempt.estimated);
@@ -177,13 +182,14 @@ export function AttemptInput({
   const elapsed = parseTimeDraft(draftInput);
   const isOverCap =
     capCentiseconds !== undefined && elapsed !== null && elapsed > capCentiseconds;
+  // Nothing to say about an empty attempt; silence keeps a scorecard's worth of rows compact.
   const helperText =
     draftOutcome === "dns"
       ? "does not count towards the limit"
       : draftOutcome === "dnf" && elapsed === null
         ? "elapsed time not recorded"
         : elapsed === null
-          ? "empty attempts are skipped"
+          ? null
           : `counts ${formatTime(elapsed, { compact: true })} towards the limit${
               isOverCap
                 ? ` · over the ${formatTime(capCentiseconds, { compact: true })} cap`
@@ -193,28 +199,32 @@ export function AttemptInput({
   return (
     <FormControl disabled={disabled} fullWidth>
       <Stack
-        direction={{ xs: "column", sm: "row" }}
-        spacing={1}
-        sx={{ alignItems: { xs: "stretch", sm: "flex-start" } }}
+        direction="row"
+        sx={{ alignItems: "center", columnGap: 1, flexWrap: "wrap", rowGap: 0.5 }}
       >
         <TextField
           disabled={disabled || draftOutcome === "dns"}
-          fullWidth
           label={label}
           onBlur={() => commit()}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
+          size={size}
           slotProps={{ htmlInput: { inputMode: "numeric", spellCheck: false } }}
+          sx={{ flex: { xs: "1 1 100%", sm: "1 1 200px" }, maxWidth: { sm: 320 } }}
           type="tel"
           value={draftInput}
         />
-        <Stack direction="row" sx={{ minHeight: 56, whiteSpace: "nowrap" }}>
+        <Stack direction="row" sx={{ whiteSpace: "nowrap" }}>
           <FormControlLabel
-            control={<Checkbox checked={draftOutcome === "dnf"} onChange={toggleDnf} />}
+            control={
+              <Checkbox checked={draftOutcome === "dnf"} onChange={toggleDnf} size={size} />
+            }
             label="DNF"
           />
           <FormControlLabel
-            control={<Checkbox checked={draftOutcome === "dns"} onChange={toggleDns} />}
+            control={
+              <Checkbox checked={draftOutcome === "dns"} onChange={toggleDns} size={size} />
+            }
             label="DNS"
           />
           <FormControlLabel
@@ -227,15 +237,20 @@ export function AttemptInput({
                   setDraftEstimated(next);
                   commit(draftOutcome, draftInput, next);
                 }}
+                size={size}
               />
             }
             label="Estimated"
           />
         </Stack>
+        {helperText ? (
+          <FormHelperText
+            sx={{ flex: "1 1 160px", m: 0, ...(isOverCap ? { color: "warning.main" } : {}) }}
+          >
+            {helperText}
+          </FormHelperText>
+        ) : null}
       </Stack>
-      <FormHelperText sx={isOverCap ? { color: "warning.main" } : undefined}>
-        {helperText}
-      </FormHelperText>
     </FormControl>
   );
 }

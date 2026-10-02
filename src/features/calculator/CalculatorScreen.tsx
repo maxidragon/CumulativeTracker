@@ -2,14 +2,11 @@ import {
   Alert,
   Box,
   Button,
-  Card,
-  CardContent,
-  Chip,
-  Divider,
   FormControl,
   Grid,
   InputLabel,
   MenuItem,
+  Paper,
   Select,
   Stack,
   TextField,
@@ -18,6 +15,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { ConfirmActionDialog } from "../../components/ConfirmActionDialog";
+import { Stat } from "../../components/Stat";
 import { formatTime } from "../../lib/attempt";
 import {
   attemptsLeft,
@@ -153,210 +151,173 @@ export function CalculatorScreen() {
     );
 
   return (
-    <Stack spacing={5}>
+    <Stack spacing={3} sx={{ maxWidth: 760 }}>
       <Box>
-        <Chip color="secondary" label="No login · stays on this device" size="small" />
-        <Typography component="h1" sx={{ mt: 2 }} variant="h2">
+        <Typography component="h1" variant="h4">
           Cumulative limit calculator
         </Typography>
-        <Typography color="text.secondary" sx={{ fontSize: 18, mt: 1 }}>
-          Enter the final result shown on the scorecard. For a DNF, keep its elapsed
-          time and tick DNF beside it.
+        <Typography color="text.secondary" sx={{ mt: 0.5 }}>
+          Enter the time read off the timer. For a DNF, keep its elapsed time and tick DNF
+          beside it. No login; everything stays on this device.
         </Typography>
       </Box>
 
-      <Card variant="outlined">
-        <CardContent>
-          <Grid container spacing={2}>
-            {customRound ? (
-              <>
-                <Grid size={{ xs: 12, sm: 8 }}>
-                  <FormControl fullWidth>
-                    <InputLabel id="limit-preset-label">Common cumulative limit</InputLabel>
-                    <Select
-                      label="Common cumulative limit"
-                      labelId="limit-preset-label"
-                      onChange={(event) => {
-                        if (event.target.value === "custom") {
-                          setCustomLimit(true);
-                          return;
-                        }
-                        const minutes = Number(event.target.value);
-                        if (!Number.isFinite(minutes)) return;
-                        setCustomLimit(false);
-                        const next = createCustomCalculatorState(
-                          undefined,
-                          calculator.attempts.length,
-                          minutes * 6_000,
-                        );
-                        next.perAttemptLimitCentiseconds =
-                          calculator.perAttemptLimitCentiseconds;
-                        requestReplacement(next);
-                      }}
-                      value={
-                        isCustomLimit
-                          ? "custom"
-                          : String(calculator.limitCentiseconds / 6_000)
+      <Paper sx={{ p: 2 }} variant="outlined">
+        <Grid container spacing={2}>
+          {customRound ? (
+            <>
+              <Grid size={{ xs: 6, sm: 4 }}>
+                <FormControl fullWidth>
+                  <InputLabel id="limit-preset-label">Cumulative limit</InputLabel>
+                  <Select
+                    label="Cumulative limit"
+                    labelId="limit-preset-label"
+                    onChange={(event) => {
+                      if (event.target.value === "custom") {
+                        setCustomLimit(true);
+                        return;
                       }
-                    >
-                      {calculatorLimitPresets.map((minutes) => (
-                        <MenuItem key={minutes} value={minutes}>
-                          {minutes}:00
-                        </MenuItem>
-                      ))}
-                      <MenuItem value="custom">Custom limit</MenuItem>
-                    </Select>
-                  </FormControl>
-                </Grid>
-                <Grid size={{ xs: 12, sm: 4 }}>
-                  <FormControl fullWidth>
-                    <InputLabel id="attempt-count-label">Attempts</InputLabel>
-                    <Select
-                      label="Attempts"
-                      labelId="attempt-count-label"
-                      onChange={(event) => {
-                        if (event.target.value === "custom") {
-                          setCustomAttempts(true);
-                          setCustomAttemptsDraft(String(calculator.attempts.length));
-                          setCustomAttemptsError(false);
-                          return;
-                        }
-                        setCustomAttempts(false);
-                        const next = createCustomCalculatorState(
-                          undefined,
-                          Number(event.target.value),
-                          calculator.limitCentiseconds,
-                        );
-                        next.perAttemptLimitCentiseconds =
-                          calculator.perAttemptLimitCentiseconds;
-                        requestReplacement(next);
-                      }}
-                      value={
-                        customAttempts || ![1, 2, 3, 5].includes(calculator.attempts.length)
-                          ? "custom"
-                          : calculator.attempts.length
-                      }
-                    >
-                      {[1, 2, 3, 5].map((count) => (
-                        <MenuItem key={count} value={count}>
-                          {count}
-                        </MenuItem>
-                      ))}
-                      <MenuItem value="custom">
-                        Custom
-                      </MenuItem>
-                    </Select>
-                  </FormControl>
-                </Grid>
-                {customAttempts || ![1, 2, 3, 5].includes(calculator.attempts.length) ? (
-                  <Grid size={{ xs: 12, sm: 4 }}>
-                    <TextField
-                      error={customAttemptsError}
-                      fullWidth
-                      helperText={customAttemptsError ? "Enter a whole number from 1 to 100." : "1–100 attempts"}
-                      label="Custom attempts"
-                      onBlur={commitCustomAttempts}
-                      onChange={(event) => {
-                        setCustomAttemptsDraft(event.target.value);
-                        setCustomAttemptsError(false);
-                      }}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter") {
-                          event.preventDefault();
-                          commitCustomAttempts();
-                        }
-                      }}
-                      slotProps={{ htmlInput: { inputMode: "numeric", min: 1, max: 100 } }}
-                      type="number"
-                      value={customAttemptsDraft}
-                    />
-                  </Grid>
-                ) : null}
-              </>
-            ) : null}
-
-            {isCustomLimit ? (
-              <Grid size={{ xs: 12, sm: 6 }}>
-                <TimeSettingField
-                  label="Custom cumulative limit"
-                  onCommit={(limit) => {
-                    if (limit !== null) {
-                      updateLimits(limit, calculator.perAttemptLimitCentiseconds);
+                      const minutes = Number(event.target.value);
+                      if (!Number.isFinite(minutes)) return;
+                      setCustomLimit(false);
+                      const next = createCustomCalculatorState(
+                        undefined,
+                        calculator.attempts.length,
+                        minutes * 6_000,
+                      );
+                      next.perAttemptLimitCentiseconds =
+                        calculator.perAttemptLimitCentiseconds;
+                      requestReplacement(next);
+                    }}
+                    value={
+                      isCustomLimit
+                        ? "custom"
+                        : String(calculator.limitCentiseconds / 6_000)
                     }
-                  }}
-                  value={calculator.limitCentiseconds}
-                />
+                  >
+                    {calculatorLimitPresets.map((minutes) => (
+                      <MenuItem key={minutes} value={minutes}>
+                        {minutes}:00
+                      </MenuItem>
+                    ))}
+                    <MenuItem value="custom">Custom limit</MenuItem>
+                  </Select>
+                </FormControl>
               </Grid>
-            ) : null}
-            <Grid size={{ xs: 12, sm: 6 }}>
+              <Grid size={{ xs: 6, sm: 4 }}>
+                <FormControl fullWidth>
+                  <InputLabel id="attempt-count-label">Attempts</InputLabel>
+                  <Select
+                    label="Attempts"
+                    labelId="attempt-count-label"
+                    onChange={(event) => {
+                      if (event.target.value === "custom") {
+                        setCustomAttempts(true);
+                        setCustomAttemptsDraft(String(calculator.attempts.length));
+                        setCustomAttemptsError(false);
+                        return;
+                      }
+                      setCustomAttempts(false);
+                      const next = createCustomCalculatorState(
+                        undefined,
+                        Number(event.target.value),
+                        calculator.limitCentiseconds,
+                      );
+                      next.perAttemptLimitCentiseconds =
+                        calculator.perAttemptLimitCentiseconds;
+                      requestReplacement(next);
+                    }}
+                    value={
+                      customAttempts || ![1, 2, 3, 5].includes(calculator.attempts.length)
+                        ? "custom"
+                        : calculator.attempts.length
+                    }
+                  >
+                    {[1, 2, 3, 5].map((count) => (
+                      <MenuItem key={count} value={count}>
+                        {count}
+                      </MenuItem>
+                    ))}
+                    <MenuItem value="custom">
+                      Custom
+                    </MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              {customAttempts || ![1, 2, 3, 5].includes(calculator.attempts.length) ? (
+                <Grid size={{ xs: 12, sm: 4 }}>
+                  <TextField
+                    error={customAttemptsError}
+                    fullWidth
+                    helperText={customAttemptsError ? "Enter a whole number from 1 to 100." : "1–100 attempts"}
+                    label="Custom attempts"
+                    onBlur={commitCustomAttempts}
+                    onChange={(event) => {
+                      setCustomAttemptsDraft(event.target.value);
+                      setCustomAttemptsError(false);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        commitCustomAttempts();
+                      }
+                    }}
+                    slotProps={{ htmlInput: { inputMode: "numeric", min: 1, max: 100 } }}
+                    type="number"
+                    value={customAttemptsDraft}
+                  />
+                </Grid>
+              ) : null}
+            </>
+          ) : null}
+
+          {isCustomLimit ? (
+            <Grid size={{ xs: 12, sm: 4 }}>
               <TimeSettingField
-                label="Per-attempt limit"
-                onCommit={(perAttempt) =>
-                  updateLimits(calculator.limitCentiseconds, perAttempt)
-                }
-                optional
-                value={calculator.perAttemptLimitCentiseconds}
+                label="Custom cumulative limit"
+                onCommit={(limit) => {
+                  if (limit !== null) {
+                    updateLimits(limit, calculator.perAttemptLimitCentiseconds);
+                  }
+                }}
+                value={calculator.limitCentiseconds}
               />
             </Grid>
-          </Grid>
-          {limitWarning ? (
-            <Alert severity="warning" sx={{ mt: 2 }}>
-              {limitWarning}
-            </Alert>
           ) : null}
-        </CardContent>
-      </Card>
+          <Grid size={{ xs: 12, sm: 4 }}>
+            <TimeSettingField
+              label="Per-attempt limit"
+              onCommit={(perAttempt) =>
+                updateLimits(calculator.limitCentiseconds, perAttempt)
+              }
+              optional
+              value={calculator.perAttemptLimitCentiseconds}
+            />
+          </Grid>
+        </Grid>
+        {limitWarning ? (
+          <Alert severity="warning" sx={{ mt: 2 }}>
+            {limitWarning}
+          </Alert>
+        ) : null}
+      </Paper>
 
-      <Grid aria-live="polite" container spacing={2}>
-        <Grid size={{ xs: 12, sm: 6 }}>
-          <Card sx={{ height: "100%" }} variant="outlined">
-            <CardContent>
-              <Typography color="text.secondary" variant="overline">
-                Remaining
-              </Typography>
-              <Typography
-                component="p"
-                sx={{ fontVariantNumeric: "tabular-nums" }}
-                variant="h3"
-              >
-                {summary.isUpperBound ? "≤ " : ""}
-                {formatTime(Math.max(0, summary.remainingCentiseconds), {
-                  compact: true,
-                })}
-              </Typography>
-              <Typography color="text.secondary">
-                used {formatTime(summary.usedCentiseconds, { compact: true })} of{" "}
-                {formatTime(calculator.limitCentiseconds, { compact: true })}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid size={{ xs: 12, sm: 6 }}>
-          <Card sx={{ height: "100%" }} variant="outlined">
-            <CardContent>
-              <Typography color="text.secondary" variant="overline">
-                Next attempt cap
-              </Typography>
-              <Typography
-                component="p"
-                sx={{ fontVariantNumeric: "tabular-nums" }}
-                variant="h3"
-              >
-                {summary.isUpperBound ? "≤ " : ""}
-                {formatTime(Math.max(0, summary.capForNextAttemptCentiseconds), {
-                  compact: true,
-                })}
-              </Typography>
-              <Typography color="text.secondary">
-                {remainingAttempts} attempt{remainingAttempts === 1 ? "" : "s"} left
-                {average !== null && remainingAttempts > 1
-                  ? ` · avg ${formatTime(average, { compact: true })} each`
-                  : ""}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
+      <Box
+        aria-live="polite"
+        sx={{ display: "grid", gap: 2, gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)" }}
+      >
+        <Stat
+          caption={`used ${formatTime(summary.usedCentiseconds, { compact: true })} of ${formatTime(calculator.limitCentiseconds, { compact: true })}`}
+          label="Remaining"
+          value={`${summary.isUpperBound ? "≤ " : ""}${formatTime(Math.max(0, summary.remainingCentiseconds), { compact: true })}`}
+        />
+        <Stat
+          caption={`${remainingAttempts} attempt${remainingAttempts === 1 ? "" : "s"} left${average !== null && remainingAttempts > 1 ? ` · avg ${formatTime(average, { compact: true })} each` : ""}`}
+          emphasis
+          label="Next attempt cap"
+          value={`${summary.isUpperBound ? "≤ " : ""}${formatTime(Math.max(0, summary.capForNextAttemptCentiseconds), { compact: true })}`}
+        />
+      </Box>
 
       {summary.unknownCount > 0 ? (
         <Alert severity="warning">
@@ -368,7 +329,7 @@ export function CalculatorScreen() {
         <Alert severity="error">The cumulative limit is exhausted.</Alert>
       ) : null}
 
-      <Stack divider={<Divider flexItem />} spacing={3}>
+      <Stack spacing={1.5}>
         {orderedAttempts(calculator.attempts).map((attempt, index) => {
           const before = budgetBeforeAttempt(
             budget,
