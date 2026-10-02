@@ -8,7 +8,7 @@ describe("AppRouter", () => {
     render(<App />);
 
     expect(
-      screen.getByRole("heading", { name: /know exactly how much time is left/i }),
+      screen.getByRole("heading", { name: /open a competition/i }),
     ).toBeInTheDocument();
   });
 

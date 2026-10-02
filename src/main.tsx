@@ -1,5 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import "@cubing/icons";
 import { App } from "./app/App";
 
 const root = document.getElementById("root");

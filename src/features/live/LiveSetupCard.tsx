@@ -131,10 +131,10 @@ export function LiveSetupCard({
 function BoxTitle() {
   return (
     <div>
-      <Typography component="h2" variant="h5">
-        Tracking mode
+      <Typography component="h2" sx={{ fontWeight: 700 }} variant="h6">
+        WCA Live
       </Typography>
-      <Typography color="text.secondary">
+      <Typography color="text.secondary" variant="body2">
         Local mode never sends results. WCA Live mode submits acknowledged attempts one at a
         time.
       </Typography>

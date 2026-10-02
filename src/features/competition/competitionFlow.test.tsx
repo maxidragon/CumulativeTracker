@@ -4,8 +4,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { CompetitionBoardScreen } from "./CompetitionBoardScreen";
-import { CompetitorScreen } from "./CompetitorScreen";
+import { GroupScreen } from "./GroupScreen";
 import { useTrackingStore } from "./trackingStore";
 import { useAuthStore } from "../auth/store";
 import { forgetScoretakingToken, saveScoretakingToken } from "../../lib/wcaLive";
@@ -47,12 +46,37 @@ const wcif = {
   ],
 } as unknown as Competition;
 
-function renderFlow(initialEntry = "/c/InventedOpen2026/g/333bf-r1") {
+const sharedLimitRound = (id: string) => ({
+  id,
+  format: "3",
+  timeLimit: { centiseconds: 360_000, cumulativeRoundIds: ["444bf-r1", "555bf-r1"] },
+  cutoff: null,
+  advancementCondition: null,
+  results: [],
+  extensions: [],
+});
+
+const sharedWcif = {
+  ...wcif,
+  persons: wcif.persons.map((person) => ({
+    ...person,
+    registration: { ...person.registration, eventIds: ["444bf", "555bf"] },
+  })),
+  events: [
+    { id: "444bf", rounds: [sharedLimitRound("444bf-r1")], extensions: [] },
+    { id: "555bf", rounds: [sharedLimitRound("555bf-r1")], extensions: [] },
+  ],
+} as unknown as Competition;
+
+function renderFlow(
+  initialEntry = "/c/InventedOpen2026/g/333bf-r1",
+  competition: Competition = wcif,
+) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
   });
-  queryClient.setQueryData(["wcif", wcif.id], {
-    wcif,
+  queryClient.setQueryData(["wcif", competition.id], {
+    wcif: competition,
     fetchedAt: "2026-01-01T00:00:00.000Z",
     fromCache: false,
   });
@@ -61,12 +85,8 @@ function renderFlow(initialEntry = "/c/InventedOpen2026/g/333bf-r1") {
       <MemoryRouter initialEntries={[initialEntry]}>
         <Routes>
           <Route
-            element={<CompetitionBoardScreen />}
-            path="/c/:competitionId/g/:groupKey"
-          />
-          <Route
-            element={<CompetitorScreen />}
-            path="/c/:competitionId/g/:groupKey/:registrantId"
+            element={<GroupScreen />}
+            path="/c/:competitionId/g/:groupKey/:registrantId?"
           />
         </Routes>
       </MemoryRouter>
@@ -103,7 +123,7 @@ describe("local competition flow", () => {
       screen.getByRole("heading", { name: /Example Competitor/i }),
     ).toBeInTheDocument();
 
-    const attempt = screen.getByLabelText("3x3x3 Blindfolded · attempt 1");
+    const attempt = screen.getByLabelText("Attempt 1");
     await user.click(attempt);
     await user.keyboard("100000{Enter}");
 
@@ -115,16 +135,48 @@ describe("local competition flow", () => {
     );
   });
 
+  it("opens a scorecard by registrant id and returns to the search after the last attempt", async () => {
+    const user = userEvent.setup();
+    renderFlow();
+    const search = screen.getByLabelText("Find competitor (registrant id or name)");
+    await user.click(search);
+    await user.keyboard("7{Enter}");
+
+    const first = await screen.findByLabelText("Attempt 1");
+    expect(first).toHaveFocus();
+    await user.keyboard("40000{Enter}40000{Enter}");
+    expect(screen.getByLabelText("Attempt 3")).toHaveFocus();
+    await user.keyboard("{Enter}");
+    expect(search).toHaveFocus();
+  });
+
   it("keeps the scorecard usable when an attempt overruns the whole budget", async () => {
     const user = userEvent.setup();
     renderFlow("/c/InventedOpen2026/g/333bf-r1/7");
-    const attempt = await screen.findByLabelText("3x3x3 Blindfolded · attempt 1");
+    const attempt = await screen.findByLabelText("Attempt 1");
     await user.click(attempt);
     await user.keyboard("250000{Enter}");
 
     expect(
       await screen.findByText("The cumulative limit is exhausted."),
     ).toBeInTheDocument();
+  });
+
+  it("reorders attempts across the events of a shared limit", async () => {
+    const user = userEvent.setup();
+    renderFlow("/c/InventedOpen2026/g/444bf-r1+555bf-r1/7", sharedWcif);
+    const sequence = () =>
+      Array.from(document.querySelectorAll("[data-attempt-key]"), (row) =>
+        row.getAttribute("data-attempt-key"),
+      );
+    await screen.findByLabelText("555bf · attempt 1");
+    expect(sequence().slice(2, 4)).toEqual(["444bf-r1:3", "555bf-r1:1"]);
+
+    await user.click(
+      screen.getByRole("button", { name: "Move 5x5x5 Blindfolded attempt 1 earlier" }),
+    );
+
+    expect(sequence().slice(2, 4)).toEqual(["555bf-r1:1", "444bf-r1:3"]);
   });
 
   it("submits a committed attempt immediately in WCA Live mode", async () => {
@@ -147,28 +199,9 @@ describe("local competition flow", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const queryClient = new QueryClient({
-      defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
-    });
-    queryClient.setQueryData(["wcif", wcif.id], {
-      wcif,
-      fetchedAt: "2026-01-01T00:00:00.000Z",
-      fromCache: false,
-    });
-    render(
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={["/c/InventedOpen2026/g/333bf-r1/7"]}>
-          <Routes>
-            <Route
-              element={<CompetitorScreen />}
-              path="/c/:competitionId/g/:groupKey/:registrantId"
-            />
-          </Routes>
-        </MemoryRouter>
-      </QueryClientProvider>,
-    );
+    renderFlow("/c/InventedOpen2026/g/333bf-r1/7");
     const user = userEvent.setup();
-    const input = await screen.findByLabelText("3x3x3 Blindfolded · attempt 1");
+    const input = await screen.findByLabelText("Attempt 1");
     await user.click(input);
     await user.keyboard("100000{Enter}");
 
@@ -191,8 +224,10 @@ describe("local competition flow", () => {
       attemptNumber: 1,
       attemptResult: 60_000,
     });
+    const attemptRow = input.closest<HTMLElement>("[data-attempt-key]");
+    if (!attemptRow) throw new Error("Attempt row was not rendered.");
     await waitFor(() =>
-      expect(screen.getByText("On WCA Live")).toBeInTheDocument(),
+      expect(within(attemptRow).getByText("On WCA Live")).toBeInTheDocument(),
     );
   });
 });

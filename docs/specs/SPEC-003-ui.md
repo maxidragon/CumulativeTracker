@@ -13,11 +13,11 @@ only ever serves `index.html`, and deep links work without any server-side coope
 
 | Route | Screen |
 | --- | --- |
-| `#/` | Home: start a calculator, or open a competition by id (recent competitions listed from `localStorage`) |
+| `#/` | Home: open a competition by id (managed and recent competitions listed below), or start a calculator |
 | `#/calculator` | Calculator, state encoded in the route's query string |
 | `#/c/:competitionId` | Competition overview: cumulative groups, rounds, mode switch, sign-in and token state |
-| `#/c/:competitionId/g/:groupKey` | Board: every competitor in the group with their budget |
-| `#/c/:competitionId/g/:groupKey/:registrantId` | Competitor view: attempts, entry, budget detail |
+| `#/c/:competitionId/g/:groupKey` | Group workspace: every competitor in the group with their budget |
+| `#/c/:competitionId/g/:groupKey/:registrantId` | Group workspace with that competitor's entry panel open |
 | `#/settings` | Theme, stored tokens, stored competition data, clear-everything |
 
 ### The hash is shared with OAuth
@@ -109,16 +109,43 @@ Presets cover the common announcements: 3BLD bo3 20:00 · 3BLD mo3 30:00 · 4BLD
 5BLD 60:00 · 4BLD+5BLD 60:00 shared. Presets are a convenience, never a claim about what a
 competition announced.
 
-## Board
+## Group workspace
 
-A table on a laptop, a list of cards on a phone. One row per competitor registered for any
-round in the group, sorted by remaining budget ascending by default (the competitors closest to
-trouble first), with a name/registrant-id search that matches on both and a keyboard shortcut
-(`/`) to focus it.
+The scoretaker's screen, laid out for a laptop first. The board and the competitor view are
+one screen on one route (`:registrantId` is optional), so moving between scorecards never
+reloads the table or loses the search.
 
-Columns: competitor (name, registrant id, country flag), per-round attempt chips, used,
-remaining, next cap, status. In WCA Live mode a sync column shows per-competitor submission
-state.
+It follows WCA Live's scoretaking layout, because scoretakers already know it: on a laptop the
+entry column sits on the left — the competitor field on top, the picked competitor's attempts
+below it — and the round's table fills the rest. On a phone the entry column comes first and
+the table is hidden while a competitor is open; the panel's close button returns to it.
+
+### The keyboard loop
+
+Entering a stack of scorecards should never need the mouse:
+
+1. `/` focuses the competitor search from anywhere outside a field.
+2. Type a registrant id (or part of a name) and press `Enter`. An exact registrant id wins;
+   otherwise the first row of the filtered table. The search clears and the panel opens.
+3. The cursor lands on that competitor's **next empty attempt**, not the first one, so a
+   scorecard that comes back for its third attempt continues where it stopped.
+4. `Enter` commits each attempt and moves to the next ([attempt input](#the-attempt-input)).
+   `Enter` on the last attempt returns the cursor to the search, ready for the next scorecard.
+
+`Escape` in the search clears it.
+
+### Table
+
+One row per competitor registered for any round in the group, sorted by remaining budget
+ascending (the competitors closest to trouble first), filtered live by the search, which
+matches name and registrant id. The open competitor's row is highlighted.
+
+Columns, as in WCA Live's round table: registrant id, competitor (name, country flag), then one
+column per attempt — grouped under each event's icon and id when the group spans several
+events, with a DNF showing its elapsed time as `DNF (10:00)` — then remaining, next cap and
+status. Clicking anywhere on a row opens that competitor. In WCA Live mode a sync column shows
+per-competitor submission state, and the header counts the entered attempts that are not on
+WCA Live yet. Used time is in the entry panel, not the table.
 
 Status is never colour alone — every state carries an icon and a word:
 
@@ -130,16 +157,25 @@ Status is never colour alone — every state carries an icon and a word:
 | `Exhausted` | `remaining <= 0`; remaining attempts should be DNS |
 | `Incomplete` | A DNF is missing its elapsed time; remaining is an upper bound |
 
-## Competitor view
+### Entry panel
 
-The judge's screen. Everything above the fold on a phone:
+What the judge or scoretaker needs, top to bottom:
 
 1. Competitor name and registrant id.
-2. The cap for the next attempt, in the largest type on the screen.
-3. Remaining, used, limit.
-4. The attempts, in group order, each editable in place, each showing which round it belongs to
-   when the group spans several events.
-5. Actions: **Stopped at the limit**, **DNS the rest**, and (WCA Live mode) **Submit**.
+2. The cap for the next attempt, in the largest type on the screen, beside remaining and
+   `used … of …`.
+3. Warnings: missing elapsed times, exhausted budget, offline, WCA Live unreachable.
+4. The attempts, in group order, each editable in place. In WCA Live mode each entered attempt
+   carries one line of sync state with its action (`Submit`, `Retry`, or `Submit mine` /
+   `Take WCA Live` on a conflict).
+5. Actions: **Stopped at the limit**, **DNS the rest**, and **Clear competitor**.
+
+When the group spans several events the order the attempts were *done* decides how the budget
+runs out ([A1a2++++++](https://www.worldcubeassociation.org/regulations/#A1a2)), so the panel
+says so above the list and makes the sequence explicit: every attempt carries a numbered badge
+(its place in the sequence), the event icon, a drag handle, and "done earlier" / "done later"
+buttons. Fields are labelled by event id (`444bf · attempt 1`). A single-event group has only
+one possible order, shows none of this, and labels fields `Attempt 1`.
 
 Destructive or regulation-bearing actions — "stopped at the limit", "DNS the rest", clearing a
 competitor — confirm once, in a dialog that states exactly what will change, including which
