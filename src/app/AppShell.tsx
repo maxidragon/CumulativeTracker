@@ -5,11 +5,16 @@ import { AuthControls, AuthNotice } from "../features/auth/AuthControls";
 export function AppShell() {
   return (
     <Box sx={{ minHeight: "100dvh" }}>
-      <AppBar color="transparent" elevation={0} position="static">
-        <Container maxWidth="lg">
+      <AppBar
+        color="transparent"
+        elevation={0}
+        position="static"
+        sx={{ borderBottom: 1, borderColor: "divider" }}
+      >
+        <Container maxWidth="xl">
           <Toolbar
             disableGutters
-            sx={{ flexWrap: { xs: "wrap", sm: "nowrap" }, minHeight: 72, py: 1 }}
+            sx={{ flexWrap: { xs: "wrap", sm: "nowrap" }, minHeight: 56, py: 0.5 }}
           >
             <Typography
               color="text.primary"
@@ -34,7 +39,7 @@ export function AppShell() {
         </Container>
       </AppBar>
       <AuthNotice />
-      <Container component="main" maxWidth="lg" sx={{ py: { xs: 3, md: 9 } }}>
+      <Container component="main" maxWidth="xl" sx={{ py: { xs: 2, md: 4 } }}>
         <Outlet />
       </Container>
     </Box>

@@ -1,12 +1,11 @@
-import { ArrowForward, Calculate, Groups } from "@mui/icons-material";
+import { ArrowForward, Calculate } from "@mui/icons-material";
 import {
   Box,
   Button,
-  Card,
-  CardActions,
-  CardContent,
-  Chip,
-  Grid,
+  List,
+  ListItemButton,
+  ListItemText,
+  Paper,
   Stack,
   TextField,
   Typography,
@@ -18,26 +17,36 @@ import { readRecentCompetitions } from "../competition/data";
 import { useManagedCompetitions } from "../auth/api";
 import { useAuthStore } from "../auth/store";
 
-const entryPoints = [
-  {
-    icon: <Calculate aria-hidden="true" />,
-    title: "Quick calculator",
-    description:
-      "Choose a limit, enter attempts, and always know the cap for the next one.",
-    action: "Start calculating",
-    to: "/calculator",
-    available: true,
-  },
-  {
-    icon: <Groups aria-hidden="true" />,
-    title: "Open a competition",
-    description:
-      "Load public competition data and track a cumulative group locally or with WCA Live.",
-    action: "Open below",
-    to: "#open-competition",
-    available: true,
-  },
-] as const;
+function CompetitionList({
+  title,
+  competitions,
+}: {
+  title: string;
+  competitions: { id: string; name: string }[];
+}) {
+  return (
+    <Box>
+      <Typography color="text.secondary" variant="overline">
+        {title}
+      </Typography>
+      <Paper variant="outlined">
+        <List disablePadding>
+          {competitions.map((competition) => (
+            <ListItemButton
+              component={Link}
+              divider
+              key={competition.id}
+              to={`/c/${encodeURIComponent(competition.id)}`}
+            >
+              <ListItemText primary={competition.name} secondary={competition.id} />
+              <ArrowForward aria-hidden="true" color="action" fontSize="small" />
+            </ListItemButton>
+          ))}
+        </List>
+      </Paper>
+    </Box>
+  );
+}
 
 export function HomeScreen() {
   const navigate = useNavigate();
@@ -58,82 +67,40 @@ export function HomeScreen() {
   };
 
   return (
-    <Stack spacing={{ xs: 5, md: 8 }}>
-      <Box sx={{ maxWidth: 780 }}>
-        <Chip color="secondary" label="Built for WCA cumulative limits" size="small" />
-        <Typography component="h1" sx={{ mt: 2 }} variant="h1">
-          Know exactly how much time is left.
-        </Typography>
-        <Typography
-          color="text.secondary"
-          sx={{ fontSize: { xs: 20, md: 24 }, lineHeight: 1.45, mt: 3 }}
-        >
-          Track elapsed time, preserve DNF timings, and make the next-attempt cap
-          impossible to miss.
-        </Typography>
-      </Box>
-
-      <Grid container spacing={3}>
-        {entryPoints.map((entry) => (
-          <Grid key={entry.title} size={{ xs: 12, md: 6 }}>
-            <Card
-              variant="outlined"
-              sx={{ display: "flex", flexDirection: "column", height: "100%", p: 1 }}
-            >
-              <CardContent sx={{ flexGrow: 1 }}>
-                <Box color="primary.main" sx={{ mb: 2 }}>
-                  {entry.icon}
-                </Box>
-                <Typography component="h2" gutterBottom variant="h5">
-                  {entry.title}
-                </Typography>
-                <Typography color="text.secondary">{entry.description}</Typography>
-              </CardContent>
-              <CardActions>
-                {entry.to.startsWith("#") ? (
-                  <Button
-                    endIcon={<ArrowForward />}
-                    onClick={() =>
-                      document.getElementById("open-competition")?.scrollIntoView({
-                        behavior: "smooth",
-                      })
-                    }
-                  >
-                    {entry.action}
-                  </Button>
-                ) : (
-                  <Button
-                    component={Link}
-                    disabled={!entry.available}
-                    endIcon={entry.available ? <ArrowForward /> : undefined}
-                    to={entry.to}
-                  >
-                    {entry.action}
-                  </Button>
-                )}
-              </CardActions>
-            </Card>
-          </Grid>
-        ))}
-      </Grid>
-
-      <Box id="open-competition" sx={{ maxWidth: 780, scrollMarginTop: 24 }}>
-        <Typography component="h2" gutterBottom variant="h4">
-          Open a competition
-        </Typography>
-        <Typography color="text.secondary" sx={{ mb: 2 }}>
-          Public WCIF data is loaded from the WCA. Sign-in is not required.
-        </Typography>
+    <Box
+      sx={{
+        display: "grid",
+        gap: { xs: 4, md: 6 },
+        gridTemplateColumns: { xs: "minmax(0, 1fr)", md: "minmax(0, 2fr) minmax(0, 1fr)" },
+        maxWidth: 1100,
+      }}
+    >
+      <Stack spacing={3}>
+        <Box>
+          <Typography component="h1" variant="h4">
+            Open a competition
+          </Typography>
+          <Typography color="text.secondary" sx={{ mt: 0.5 }}>
+            Track WCA cumulative time limits for every competitor in a group. Public
+            competition data is loaded from the WCA; sign-in is only needed for WCA Live.
+          </Typography>
+        </Box>
         <Stack
           component="form"
           direction={{ xs: "column", sm: "row" }}
           onSubmit={openCompetition}
-          spacing={2}
+          spacing={1}
+          sx={{ alignItems: { sm: "flex-start" } }}
         >
           <TextField
+            autoFocus
             error={competitionIdError}
             fullWidth
-            helperText={competitionIdError ? "Enter a WCA competition id." : undefined}
+            helperText={
+              competitionIdError
+                ? "Enter a WCA competition id."
+                : "The id from the competition's WCA page URL."
+            }
             label="Competition id"
             onChange={(event) => {
               setCompetitionId(event.target.value);
@@ -142,59 +109,36 @@ export function HomeScreen() {
             placeholder="ExampleOpen2026"
             value={competitionId}
           />
-          <Button type="submit" variant="contained">
+          <Button sx={{ minHeight: 56, px: 4 }} type="submit" variant="contained">
             Open
           </Button>
         </Stack>
 
         {session && managed.data && managed.data.length > 0 ? (
-          <Box sx={{ mt: 4 }}>
-            <Typography color="text.secondary" gutterBottom variant="overline">
-              Competitions you manage
-            </Typography>
-            <Stack spacing={1}>
-              {managed.data.map((competition) => (
-                <Button
-                  component={Link}
-                  key={competition.id}
-                  sx={{ justifyContent: "flex-start" }}
-                  to={`/c/${encodeURIComponent(competition.id)}`}
-                  variant="outlined"
-                >
-                  {competition.name}
-                </Button>
-              ))}
-            </Stack>
-          </Box>
+          <CompetitionList competitions={managed.data} title="Competitions you manage" />
         ) : null}
-
         {session && managed.isError ? (
-          <Typography color="error" sx={{ mt: 2 }} variant="body2">
+          <Typography color="error" variant="body2">
             Managed competitions could not be loaded. You can still enter an id above.
           </Typography>
         ) : null}
-
         {recent.length > 0 ? (
-          <Box sx={{ mt: 4 }}>
-            <Typography color="text.secondary" gutterBottom variant="overline">
-              Recent competitions
-            </Typography>
-            <Stack spacing={1}>
-              {recent.map((competition) => (
-                <Button
-                  component={Link}
-                  key={competition.id}
-                  sx={{ justifyContent: "flex-start" }}
-                  to={`/c/${encodeURIComponent(competition.id)}`}
-                  variant="outlined"
-                >
-                  {competition.name}
-                </Button>
-              ))}
-            </Stack>
-          </Box>
+          <CompetitionList competitions={recent} title="Recent competitions" />
         ) : null}
-      </Box>
-    </Stack>
+      </Stack>
+
+      <Paper sx={{ alignSelf: "start", p: 3 }} variant="outlined">
+        <Calculate aria-hidden="true" color="primary" />
+        <Typography component="h2" sx={{ mt: 1 }} variant="h6">
+          Quick calculator
+        </Typography>
+        <Typography color="text.secondary" sx={{ mb: 2 }} variant="body2">
+          No competition, no login: a limit, some attempts, and the cap for the next one.
+        </Typography>
+        <Button component={Link} endIcon={<ArrowForward />} to="/calculator" variant="outlined">
+          Start calculating
+        </Button>
+      </Paper>
+    </Box>
   );
 }

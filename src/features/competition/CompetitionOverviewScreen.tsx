@@ -2,11 +2,8 @@ import {
   Alert,
   Box,
   Button,
-  Card,
-  CardActions,
-  CardContent,
   Chip,
-  Grid,
+  Paper,
   Stack,
   Typography,
 } from "@mui/material";
@@ -65,10 +62,17 @@ export function CompetitionOverviewScreen() {
       onRetry={() => void query.refetch()}
     >
       {query.data ? (
-        <Stack spacing={5}>
+        <Stack spacing={3}>
           <Box>
-            <Stack direction="row" sx={{ flexWrap: "wrap", gap: 1, mb: 2 }}>
-              <Chip color="secondary" label="Local mode" size="small" />
+            <Typography component="h1" variant="h4">
+              {query.data.wcif.name}
+            </Typography>
+            <Stack direction="row" sx={{ alignItems: "center", flexWrap: "wrap", gap: 1, mt: 1 }}>
+              {tracking?.liveEnabled ? (
+                <Chip color="primary" label="WCA Live mode" size="small" />
+              ) : (
+                <Chip color="secondary" label="Local mode" size="small" />
+              )}
               {permissionHint ? (
                 <Chip color="success" label="Competition manager" size="small" />
               ) : null}
@@ -79,13 +83,10 @@ export function CompetitionOverviewScreen() {
                   size="small"
                 />
               ) : null}
+              <Typography color="text.secondary" variant="body2">
+                Pick the time-limit group you are scoretaking.
+              </Typography>
             </Stack>
-            <Typography component="h1" variant="h2">
-              {query.data.wcif.name}
-            </Typography>
-            <Typography color="text.secondary" sx={{ mt: 1 }}>
-              Pick a group to track. Attempts stay in this browser and are not sent anywhere.
-            </Typography>
           </Box>
 
           {session && permissionHint === false && !permissionWarningDismissed ? (
@@ -95,84 +96,92 @@ export function CompetitionOverviewScreen() {
             </Alert>
           ) : null}
 
-          <LiveSetupCard
-            competitionId={competitionId}
-            liveEnabled={tracking?.liveEnabled ?? false}
-            onLiveEnabledChange={(enabled) => setLiveEnabled(competitionId, enabled)}
-          />
-
-          {groups.length === 0 ? (
-            <Alert severity="info">
-              This competition has no supported rounds with a time limit in its public WCIF.
-            </Alert>
-          ) : (
-            <Grid container spacing={3}>
-              {groups.map((group) => {
-                const perAttempt = tracking?.groupSettings[group.key] ?? null;
-                return (
-                  <Grid key={group.key} size={{ xs: 12, md: 6 }}>
-                    <Card sx={{ display: "flex", flexDirection: "column", height: "100%" }} variant="outlined">
-                      <CardContent sx={{ flexGrow: 1 }}>
-                        <Stack spacing={2} sx={{ alignItems: "flex-start" }}>
-                          <Chip
-                            label={group.cumulative ? "Cumulative" : "Per-attempt only"}
-                            size="small"
-                            variant="outlined"
-                          />
-                          <Typography component="h2" variant="h5">
+          <Box
+            sx={{
+              display: "grid",
+              gap: 3,
+              alignItems: "start",
+              gridTemplateColumns: {
+                xs: "minmax(0, 1fr)",
+                md: "minmax(0, 2fr) minmax(0, 1fr)",
+              },
+            }}
+          >
+            <Stack spacing={2}>
+              {groups.length === 0 ? (
+                <Alert severity="info">
+                  This competition has no supported rounds with a time limit in its public
+                  WCIF.
+                </Alert>
+              ) : (
+                groups.map((group) => {
+                  const perAttempt = tracking?.groupSettings[group.key] ?? null;
+                  return (
+                    <Paper key={group.key} sx={{ p: 2 }} variant="outlined">
+                      <Stack
+                        direction={{ xs: "column", sm: "row" }}
+                        spacing={2}
+                        sx={{ alignItems: { sm: "center" } }}
+                      >
+                        <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+                          <Typography component="h2" sx={{ fontWeight: 700 }} variant="h6">
                             {groupTitle(group)}
                           </Typography>
-                          <Typography color="text.secondary">
-                            {group.cumulative ? "Shared limit" : "Attempt limit"}: {" "}
+                          <Typography color="text.secondary" variant="body2">
+                            {group.cumulative ? "Cumulative limit" : "Per-attempt limit only"}{" "}
                             <strong>
                               {formatTime(group.limitCentiseconds, { compact: true })}
                             </strong>
                           </Typography>
-                          {group.cumulative ? (
-                            <>
-                              <TimeSettingField
-                                label="Additional per-attempt limit"
-                                onCommit={(value) =>
-                                  setGroupPerAttemptLimit(competitionId, group.key, value)
-                                }
-                                optional
-                                value={perAttempt}
-                              />
-                              {perAttempt !== null &&
-                              perAttempt > group.limitCentiseconds ? (
-                                <Alert severity="warning">
-                                  The per-attempt limit cannot be greater than the cumulative
-                                  limit.
-                                </Alert>
-                              ) : null}
-                            </>
-                          ) : null}
-                        </Stack>
-                      </CardContent>
-                      <CardActions>
+                        </Box>
+                        {group.cumulative ? (
+                          <Box sx={{ width: { sm: 220 } }}>
+                            <TimeSettingField
+                              label="Per-attempt limit"
+                              onCommit={(value) =>
+                                setGroupPerAttemptLimit(competitionId, group.key, value)
+                              }
+                              optional
+                              value={perAttempt}
+                            />
+                          </Box>
+                        ) : null}
                         <Button
                           component={Link}
+                          sx={{ flexShrink: 0 }}
                           to={`/c/${encodeURIComponent(competitionId)}/g/${encodeURIComponent(group.key)}`}
                           variant="contained"
                         >
                           Open group
                         </Button>
-                      </CardActions>
-                    </Card>
-                  </Grid>
-                );
-              })}
-            </Grid>
-          )}
+                      </Stack>
+                      {perAttempt !== null && perAttempt > group.limitCentiseconds ? (
+                        <Alert severity="warning" sx={{ mt: 2 }}>
+                          The per-attempt limit cannot be greater than the cumulative limit.
+                        </Alert>
+                      ) : null}
+                    </Paper>
+                  );
+                })
+              )}
 
-          {unsupported.length > 0 ? (
-            <Alert severity="info">
-              Unsupported rounds are shown but cannot be tracked: {" "}
-              {unsupported
-                .map(({ eventName, roundNumber }) => `${eventName} Round ${roundNumber}`)
-                .join(", ")}.
-            </Alert>
-          ) : null}
+              {unsupported.length > 0 ? (
+                <Typography color="text.secondary" variant="body2">
+                  Not trackable here:{" "}
+                  {unsupported
+                    .map(({ eventName, roundNumber }) => `${eventName} Round ${roundNumber}`)
+                    .join(", ")}
+                  .
+                </Typography>
+              ) : null}
+            </Stack>
+
+            <LiveSetupCard
+              competitionId={competitionId}
+              liveEnabled={tracking?.liveEnabled ?? false}
+              onLiveEnabledChange={(enabled) => setLiveEnabled(competitionId, enabled)}
+            />
+          </Box>
         </Stack>
       ) : null}
     </CompetitionState>

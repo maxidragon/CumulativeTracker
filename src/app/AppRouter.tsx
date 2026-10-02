@@ -12,13 +12,8 @@ const CompetitionOverviewScreen = lazy(async () => ({
   default: (await import("../features/competition/CompetitionOverviewScreen"))
     .CompetitionOverviewScreen,
 }));
-const CompetitionBoardScreen = lazy(async () => ({
-  default: (await import("../features/competition/CompetitionBoardScreen"))
-    .CompetitionBoardScreen,
-}));
-const CompetitorScreen = lazy(async () => ({
-  default: (await import("../features/competition/CompetitorScreen"))
-    .CompetitorScreen,
+const GroupScreen = lazy(async () => ({
+  default: (await import("../features/competition/GroupScreen")).GroupScreen,
 }));
 const SettingsScreen = lazy(async () => ({
   default: (await import("../features/settings/SettingsScreen")).SettingsScreen,
@@ -80,18 +75,10 @@ export function AppRouter() {
             }
           />
           <Route
-            path="c/:competitionId/g/:groupKey"
+            path="c/:competitionId/g/:groupKey/:registrantId?"
             element={
               <RouteContent loadingLabel="Loading group">
-                <CompetitionBoardScreen />
-              </RouteContent>
-            }
-          />
-          <Route
-            path="c/:competitionId/g/:groupKey/:registrantId"
-            element={
-              <RouteContent loadingLabel="Loading competitor">
-                <CompetitorScreen />
+                <GroupScreen />
               </RouteContent>
             }
           />

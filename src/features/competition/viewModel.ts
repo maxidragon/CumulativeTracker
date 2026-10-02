@@ -62,15 +62,16 @@ export function competitorStatus(
   return "On track";
 }
 
-export function formatAttemptChip(attempt: TrackedAttempt): string {
-  if (attempt.outcome === "skipped") return `#${attempt.attemptNumber} —`;
-  if (attempt.outcome === "dns") return `#${attempt.attemptNumber} DNS`;
+/** A results-table cell: what WCA Live would show, plus the elapsed time behind a DNF. */
+export function formatAttemptResult(attempt: TrackedAttempt): string {
+  if (attempt.outcome === "skipped") return "";
+  if (attempt.outcome === "dns") return "DNS";
   if (attempt.outcome === "dnf") {
     return attempt.centiseconds === null
-      ? `#${attempt.attemptNumber} DNF (?)`
-      : `#${attempt.attemptNumber} DNF (${formatTime(attempt.centiseconds, { compact: true })})`;
+      ? "DNF (?)"
+      : `DNF (${formatTime(attempt.centiseconds, { compact: true })})`;
   }
-  return `#${attempt.attemptNumber} ${formatTime(attempt.centiseconds ?? 0, { compact: true })}`;
+  return formatTime(attempt.centiseconds ?? 0, { compact: true });
 }
 
 export function countryFlag(countryIso2: string): string {
@@ -80,9 +81,18 @@ export function countryFlag(countryIso2: string): string {
     .join("");
 }
 
-export function budgetSyncLabel(budget: Budget): string {
+export type SyncLabel = "Local" | "Sending" | "On WCA Live" | "Failed";
+
+export function attemptSyncLabel(attempt: TrackedAttempt): SyncLabel {
+  if (attempt.syncStatus === "synced") return "On WCA Live";
+  if (attempt.syncStatus === "sending") return "Sending";
+  if (attempt.syncStatus === "failed") return "Failed";
+  return "Local";
+}
+
+export function budgetSyncLabel(budget: Budget): SyncLabel | null {
   const entered = budget.attempts.filter(({ outcome }) => outcome !== "skipped");
-  if (entered.length === 0) return "—";
+  if (entered.length === 0) return null;
   if (entered.some(({ syncStatus }) => syncStatus === "failed")) return "Failed";
   if (entered.some(({ syncStatus }) => syncStatus === "sending")) return "Sending";
   if (
@@ -94,4 +104,14 @@ export function budgetSyncLabel(budget: Budget): string {
     return "Local";
   }
   return "On WCA Live";
+}
+
+/** Entered attempts that WCA Live does not have yet: what a scoretaker still owes. */
+export function unsyncedAttemptCount(budget: Budget): number {
+  return budget.attempts.filter(
+    (attempt) =>
+      attempt.outcome !== "skipped" &&
+      !attempt.estimated &&
+      (attempt.syncStatus !== "synced" || attempt.remoteResult !== undefined),
+  ).length;
 }
