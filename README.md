@@ -1,28 +1,26 @@
 # Cumulative Tracker
 
-A pure-frontend tool for WCA **cumulative time limits**: how much of the budget a competitor has
-spent, how long they may run on their next attempt, and — for scoretakers — entering those
-attempts into WCA Live as they happen.
+A frontend-only tool for WCA **cumulative time limits**: how much of the limit a competitor has
+used, how much is left for their next attempt, and — for scoretakers — entering those attempts
+into WCA Live.
 
-Three ways in, each a step up from the last:
+**Live:** <https://maxidragon.github.io/CumulativeTracker/>
 
-1. **Calculator** — no login, no competition. A limit, some attempts, the answer.
-2. **Competition, local** — load a competition's public WCIF, pick a cumulative group, track
-   every competitor in it. Stored in your browser, sent nowhere.
-3. **WCA Live** — sign in with WCA, paste a scoretaking token, and each attempt goes to
-   WCA Live as you enter it.
+## What it does
 
-Attempts are always entered as a **time with a DNF tickbox**, because a DNF still spends its
-elapsed time out of the cumulative budget
-([A1a5](https://www.worldcubeassociation.org/regulations/#A1a5)) and WCA Live has nowhere to
-store that time.
+- **Calculator** — no sign-in, no competition. Pick a limit and a number of attempts, enter
+  times, and see what is used and what remains. Nothing is saved.
+- **Competition** — search for a competition and open one of its cumulative time limits. Every
+  competitor in that group is listed with their used and remaining time; pick one to enter
+  their attempts. Tracking stays in your browser.
+- **WCA Live** — sign in with WCA and paste a WCA Live scoretaking token. Confirming a
+  competitor's scorecard submits their attempts to WCA Live, one request per attempt.
 
-## Status
-
-Milestones M0 through M6 are implemented: the application shell, cumulative engine,
-WCA-style attempt input, shareable calculator, local competition tracking, WCA sign-in,
-WCA Live submission and reconciliation, dark-mode preferences, accessible status treatments,
-and local-data recovery controls are in place.
+A DNF is entered as its elapsed time with the DNF button on, because a DNF still spends that
+time out of the cumulative limit
+([A1a5](https://www.worldcubeassociation.org/regulations/#A1a5)) while WCA Live only records
+`DNF`. When several events share one limit, the order the attempts were done in decides how the
+limit runs out, and attempts can be reordered to match.
 
 ## Development
 
@@ -32,6 +30,17 @@ Requires Node.js 24 and npm.
 npm install
 npm run dev
 ```
+
+Configuration comes from environment variables (see [`.env.example`](.env.example)):
+
+| Variable | Purpose |
+| --- | --- |
+| `VITE_WCA_ORIGIN` | WCA website and API; defaults to the production WCA |
+| `VITE_WCA_OAUTH_CLIENT_ID` | Client id of the WCA OAuth application; sign-in is disabled without it |
+| `VITE_WCA_LIVE_ORIGIN` | WCA Live API; defaults to production WCA Live |
+| `WCA_LIVE_PROXY_TARGET` | Development only: proxy `/wca-live` to a local WCA Live API that sends no CORS headers (set `VITE_WCA_LIVE_ORIGIN=/wca-live`) |
+
+Put local overrides in `.env.development.local`, which git ignores.
 
 Before opening a pull request, run the same checks as CI:
 
@@ -53,3 +62,7 @@ Start at [`docs/specs/README.md`](docs/specs/README.md).
 | [SPEC-003](docs/specs/SPEC-003-ui.md) | Screens, attempt input, keyboard model |
 | [SPEC-004](docs/specs/SPEC-004-integrations.md) | WCA OAuth, WCIF, WCA Live API, offline rules |
 | [SPEC-005](docs/specs/SPEC-005-architecture.md) | Stack, storage, testing, CI, milestones |
+
+## License
+
+[MIT](LICENSE)
