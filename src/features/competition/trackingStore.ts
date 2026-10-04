@@ -180,8 +180,13 @@ export const useTrackingStore = create<TrackingStore>((set) => ({
           existing.attemptNumber === attempt.attemptNumber
             ? {
                 ...attempt,
+                // Emptying an attempt WCA Live has is a clear still to be sent there.
                 syncStatus:
-                  attempt.outcome === "skipped" ? undefined : ("local" as const),
+                  attempt.outcome !== "skipped" ||
+                  existing.syncStatus === "synced" ||
+                  (existing.outcome === "skipped" && existing.syncStatus === "local")
+                    ? ("local" as const)
+                    : undefined,
                 syncError: undefined,
                 changedRemotely: false,
               }

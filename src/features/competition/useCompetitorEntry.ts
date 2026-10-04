@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import type { Person } from "@wca/helpers";
 import { officialResult, type TrackedAttempt } from "../../lib/attempt";
 import {
@@ -18,21 +19,26 @@ import {
   enterLiveAttempt,
   remoteResultForAttempt,
   takeRemoteAttempt,
+  withAcknowledgedAttempt,
+  type LiveResults,
   type ScoretakingToken,
 } from "../../lib/wcaLive";
-import { useLiveResults, useOnlineStatus } from "../live/hooks";
+import { liveResultsKey, useLiveResults, useOnlineStatus } from "../live/hooks";
 import { trackingBudgetKey, useTrackingStore } from "./trackingStore";
 import { summaryForGroup } from "./viewModel";
 
 export type CompetitorAction = "stop" | "dns" | "clear";
 
+/**
+ * Not yet on WCA Live as entered here: a new or changed result (including where WCA Live
+ * differs), or an attempt cleared here that WCA Live still has.
+ */
 function isPending(attempt: TrackedAttempt): boolean {
+  if (attempt.outcome === "skipped") return attempt.syncStatus === "local";
   return (
-    attempt.outcome !== "skipped" &&
     !attempt.estimated &&
-    attempt.remoteResult === undefined &&
-    attempt.syncStatus !== "synced" &&
-    attempt.syncStatus !== "sending"
+    attempt.syncStatus !== "sending" &&
+    (attempt.syncStatus !== "synced" || attempt.remoteResult !== undefined)
   );
 }
 
@@ -64,6 +70,7 @@ export function useCompetitorEntry(
   );
   const online = useOnlineStatus();
   const liveResults = useLiveResults(competitionId, liveToken !== null);
+  const queryClient = useQueryClient();
 
   const emptyBudget = createCompetitionBudget(person, group, perAttemptLimit);
   const budget: Budget = stored ?? emptyBudget;
@@ -95,7 +102,7 @@ export function useCompetitorEntry(
       ]?.attempts.find((attempt) => sameAttempt(attempt, target));
 
   const submitAttempt = async (attempt: TrackedAttempt, overwriteRemote = false) => {
-    if (!liveToken || !online || attempt.outcome === "skipped" || attempt.estimated) return;
+    if (!liveToken || !online || attempt.estimated || !isPending(attempt)) return;
     const round = group.rounds.find(({ roundId }) => roundId === attempt.roundId);
     if (!round) return;
     const sentResult = officialResult(attempt);
@@ -134,19 +141,32 @@ export function useCompetitorEntry(
         attemptNumber: attempt.attemptNumber,
         attemptResult: sentResult,
       });
+      // The results fetched above predate this submission. Patch them before marking the attempt
+      // synced, or reconciling against them would read the old value as a remote edit.
+      queryClient.setQueryData<LiveResults>(liveResultsKey(competitionId), (cached) =>
+        cached
+          ? withAcknowledgedAttempt(cached, group, person.registrantId, attempt, sentResult)
+          : cached,
+      );
       const latest = latestAttempt(attempt);
       if (
         latest &&
         latest.enteredAt === attempt.enteredAt &&
         officialResult(latest) === sentResult
       ) {
-        setSync(attempt, { syncStatus: "synced", syncError: undefined, remoteResult: undefined });
+        setSync(attempt, {
+          // A cleared attempt is simply empty again once WCA Live has dropped it.
+          syncStatus: attempt.outcome === "skipped" ? undefined : "synced",
+          syncError: undefined,
+          remoteResult: undefined,
+        });
       }
     } catch (error) {
       const latest = latestAttempt(attempt);
       if (latest?.enteredAt === attempt.enteredAt) {
         setSync(attempt, {
-          syncStatus: "failed",
+          // A clear that failed stays pending, so the next confirm retries it.
+          syncStatus: latest.outcome === "skipped" ? "local" : "failed",
           syncError: error instanceof Error ? error.message : "WCA Live submission failed.",
           remoteResult: latest.remoteResult,
         });
@@ -171,15 +191,29 @@ export function useCompetitorEntry(
    */
   const submitPending = async (): Promise<boolean> => {
     if (!canSubmit) return false;
-    for (const attempt of storedAttempts().filter(isPending)) await submitAttempt(attempt);
+    // Confirming the scorecard is the scoretaker's decision, so it overwrites what WCA Live has.
+    for (const attempt of storedAttempts().filter(isPending)) await submitAttempt(attempt, true);
     return storedAttempts().every(
-      (attempt) => attempt.syncStatus !== "failed" && attempt.remoteResult === undefined,
+      (attempt) =>
+        attempt.syncStatus !== "failed" &&
+        attempt.remoteResult === undefined &&
+        attempt.syncError === undefined,
     );
   };
 
   const runAction = (action: CompetitorAction) => {
     if (action === "clear") {
-      replaceBudget(competitionId, emptyBudget);
+      // Attempts WCA Live has stay marked, so confirming the scorecard clears them there too.
+      replaceBudget(competitionId, {
+        ...emptyBudget,
+        attempts: emptyBudget.attempts.map((empty) => {
+          const current = budget.attempts.find((attempt) => sameAttempt(attempt, empty));
+          const onLive =
+            current?.syncStatus === "synced" ||
+            (current?.outcome === "skipped" && current.syncStatus === "local");
+          return onLive ? { ...empty, syncStatus: "local" as const } : empty;
+        }),
+      });
       return;
     }
     if (!nextAttempt) return;

@@ -23,6 +23,45 @@ export function remoteResultForAttempt(
   return value === undefined || value === 0 ? null : value;
 }
 
+/**
+ * The results with one attempt replaced by a value WCA Live has just acknowledged, so code
+ * reading the cached results does not mistake the stale value for somebody else's edit.
+ */
+export function withAcknowledgedAttempt(
+  results: LiveResults,
+  group: CompetitionGroup,
+  registrantId: number,
+  attempt: TrackedAttempt,
+  attemptResult: number,
+): LiveResults {
+  const round = group.rounds.find(({ roundId }) => roundId === attempt.roundId);
+  if (!round) return results;
+  return {
+    ...results,
+    events: results.events.map((event) =>
+      event.eventId !== round.eventId
+        ? event
+        : {
+            ...event,
+            rounds: event.rounds.map((liveRound) =>
+              liveRound.number !== round.roundNumber
+                ? liveRound
+                : {
+                    ...liveRound,
+                    results: liveRound.results.map((result) => {
+                      if (result.personId !== registrantId) return result;
+                      const attempts = [...result.attempts];
+                      while (attempts.length < attempt.attemptNumber) attempts.push(0);
+                      attempts[attempt.attemptNumber - 1] = attemptResult;
+                      return { ...result, attempts };
+                    }),
+                  },
+            ),
+          },
+    ),
+  };
+}
+
 function attemptFromRemote(attempt: TrackedAttempt, result: number): TrackedAttempt {
   if (result === DNF_VALUE) {
     return {
@@ -78,6 +117,10 @@ export function reconcileLiveBudget(
         budget.registrantId,
         attempt,
       );
+      if (attempt.outcome === "skipped" && attempt.syncStatus === "local") {
+        // Cleared here and not yet sent: keep it empty rather than refilling it from WCA Live.
+        return remote === null ? { ...attempt, syncStatus: undefined } : attempt;
+      }
       if (remote === null) return attempt;
       if (attempt.outcome === "skipped") return attemptFromRemote(attempt, remote);
 

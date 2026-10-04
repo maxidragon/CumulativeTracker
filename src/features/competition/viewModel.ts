@@ -54,7 +54,10 @@ export function attemptSyncLabel(attempt: TrackedAttempt): SyncLabel {
 }
 
 export function budgetSyncLabel(budget: Budget): SyncLabel | null {
-  const entered = budget.attempts.filter(({ outcome }) => outcome !== "skipped");
+  // A clear not yet sent to WCA Live counts like an entered attempt that is still local.
+  const entered = budget.attempts.filter(
+    ({ outcome, syncStatus }) => outcome !== "skipped" || syncStatus === "local",
+  );
   if (entered.length === 0) return null;
   if (entered.some(({ syncStatus }) => syncStatus === "failed")) return "Failed";
   if (entered.some(({ syncStatus }) => syncStatus === "sending")) return "Sending";
@@ -71,10 +74,10 @@ export function budgetSyncLabel(budget: Budget): SyncLabel | null {
 
 /** Entered attempts that WCA Live does not have yet: what a scoretaker still owes. */
 export function unsyncedAttemptCount(budget: Budget): number {
-  return budget.attempts.filter(
-    (attempt) =>
-      attempt.outcome !== "skipped" &&
-      !attempt.estimated &&
-      (attempt.syncStatus !== "synced" || attempt.remoteResult !== undefined),
+  return budget.attempts.filter((attempt) =>
+    attempt.outcome === "skipped"
+      ? attempt.syncStatus === "local"
+      : !attempt.estimated &&
+        (attempt.syncStatus !== "synced" || attempt.remoteResult !== undefined),
   ).length;
 }

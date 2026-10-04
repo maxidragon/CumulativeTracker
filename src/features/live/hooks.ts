@@ -2,9 +2,12 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { fetchLiveResults } from "../../lib/wcaLive";
 
+export const liveResultsKey = (competitionId: string) =>
+  ["wca-live", "results", competitionId] as const;
+
 export function useLiveResults(competitionId: string, enabled: boolean) {
   return useQuery({
-    queryKey: ["wca-live", "results", competitionId],
+    queryKey: liveResultsKey(competitionId),
     queryFn: ({ signal }) => fetchLiveResults(competitionId, signal),
     enabled,
     refetchInterval: enabled ? 30_000 : false,
