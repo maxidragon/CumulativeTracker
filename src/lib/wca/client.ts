@@ -106,18 +106,86 @@ export function isCompetition(value: unknown): value is Competition {
   );
 }
 
-export async function fetchPublicWcif(
-  competitionId: string,
-  signal?: AbortSignal,
-): Promise<Competition> {
+function wcaOrigin(): string {
   const configuredOrigin: unknown = import.meta.env.VITE_WCA_ORIGIN;
-  const origin = (
+  return (
     typeof configuredOrigin === "string" && configuredOrigin !== ""
       ? configuredOrigin
       : DEFAULT_WCA_ORIGIN
   ).replace(/\/$/, "");
+}
+
+export type CompetitionSummary = {
+  id: string;
+  name: string;
+  city: string;
+  countryIso2: string;
+  startDate: string;
+  endDate: string;
+};
+
+const COMPETITION_SUMMARY_KEYS = [
+  "id",
+  "name",
+  "city",
+  "country_iso2",
+  "start_date",
+  "end_date",
+] as const;
+
+function isCompetitionSummary(
+  value: unknown,
+): value is Record<(typeof COMPETITION_SUMMARY_KEYS)[number], string> {
+  return (
+    isRecord(value) && COMPETITION_SUMMARY_KEYS.every((key) => typeof value[key] === "string")
+  );
+}
+
+/** Parses a WCA competitions index response; null when it has an unexpected shape. */
+export function parseCompetitionSummaries(value: unknown): CompetitionSummary[] | null {
+  if (!Array.isArray(value) || !value.every(isCompetitionSummary)) return null;
+  return value.map((competition) => ({
+    id: competition.id,
+    name: competition.name,
+    city: competition.city,
+    countryIso2: competition.country_iso2,
+    startDate: competition.start_date,
+    endDate: competition.end_date,
+  }));
+}
+
+export async function searchCompetitions(
+  query: string,
+  signal?: AbortSignal,
+): Promise<CompetitionSummary[]> {
+  const params = new URLSearchParams({ q: query, sort: "-start_date", per_page: "10" });
+  const response = await fetch(`${wcaOrigin()}/api/v0/competitions?${params}`, {
+    headers: { Accept: "application/json" },
+    signal,
+  });
+  if (!response.ok) {
+    throw new WcaApiError(
+      `Competition search failed: ${response.statusText || `WCA returned ${response.status}`}`,
+      response.status,
+    );
+  }
+
+  const competitions = parseCompetitionSummaries(await response.json());
+  if (!competitions) {
+    throw new WcaApiError(
+      "Competition search failed: the WCA returned an unexpected response.",
+      response.status,
+    );
+  }
+  return competitions;
+}
+
+export async function fetchPublicWcif(
+  competitionId: string,
+  signal?: AbortSignal,
+): Promise<Competition> {
   const response = await fetch(
-    `${origin}/api/v0/competitions/${encodeURIComponent(competitionId)}/wcif/public`,
+    `${wcaOrigin()}/api/v0/competitions/${encodeURIComponent(competitionId)}/wcif/public`,
     { headers: { Accept: "application/json" }, signal },
   );
 

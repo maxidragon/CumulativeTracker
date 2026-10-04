@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import type { Competition, Person } from "@wca/helpers";
+import { parseCompetitionSummaries, type CompetitionSummary } from "../../lib/wca";
 import type { AuthSession } from "./model";
 import { useAuthStore } from "./store";
 
@@ -9,12 +10,10 @@ export type CurrentUser = {
   id: number;
   name: string;
   wcaId: string | null;
+  avatarUrl: string | null;
 };
 
-export type ManagedCompetition = {
-  id: string;
-  name: string;
-};
+export type ManagedCompetition = CompetitionSummary;
 
 export class AuthApiError extends Error {
   constructor(
@@ -70,6 +69,8 @@ export async function fetchCurrentUser(
     id: me.id as number,
     name: me.name,
     wcaId: typeof me.wca_id === "string" ? me.wca_id : null,
+    avatarUrl:
+      isRecord(me.avatar) && typeof me.avatar.thumb_url === "string" ? me.avatar.thumb_url : null,
   };
 }
 
@@ -82,21 +83,11 @@ export async function fetchManagedCompetitions(
     session,
     signal,
   );
-  if (
-    !Array.isArray(value) ||
-    !value.every(
-      (competition) =>
-        isRecord(competition) &&
-        typeof competition.id === "string" &&
-        typeof competition.name === "string",
-    )
-  ) {
+  const competitions = parseCompetitionSummaries(value);
+  if (!competitions) {
     throw new AuthApiError("The WCA returned an unexpected competitions response.", 200);
   }
-  return value.map((competition) => ({
-    id: String((competition as Record<string, unknown>).id),
-    name: String((competition as Record<string, unknown>).name),
-  }));
+  return competitions;
 }
 
 export function useCurrentUser() {
@@ -130,7 +121,7 @@ export function useManagedCompetitions() {
 export function hasCompetitionPermissionHint(
   user: CurrentUser,
   competition: Competition,
-  managedCompetitions: ManagedCompetition[],
+  managedCompetitions: Pick<ManagedCompetition, "id">[],
 ): boolean {
   if (managedCompetitions.some(({ id }) => id === competition.id)) return true;
   return competition.persons.some(

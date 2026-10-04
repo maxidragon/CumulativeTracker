@@ -69,7 +69,14 @@ describe("authenticated WCA API", () => {
   it("normalizes the current user and sends the bearer token", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(
-        JSON.stringify({ me: { id: 42, name: "Example Manager", wca_id: "2000TEST01" } }),
+        JSON.stringify({
+          me: {
+            id: 42,
+            name: "Example Manager",
+            wca_id: "2000TEST01",
+            avatar: { thumb_url: "https://example.test/avatar-thumb.jpg" },
+          },
+        }),
         { status: 200 },
       ),
     );
@@ -78,6 +85,7 @@ describe("authenticated WCA API", () => {
       id: 42,
       name: "Example Manager",
       wcaId: "2000TEST01",
+      avatarUrl: "https://example.test/avatar-thumb.jpg",
     });
     const request = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(request[0]).toBe("https://www.worldcubeassociation.org/api/v0/me");
@@ -89,13 +97,29 @@ describe("authenticated WCA API", () => {
       "fetch",
       vi.fn().mockResolvedValue(
         new Response(
-          JSON.stringify([{ id: "InventedOpen2026", name: "Invented Open 2026" }]),
+          JSON.stringify([
+            {
+              id: "InventedOpen2026",
+              name: "Invented Open 2026",
+              city: "Exampleville",
+              country_iso2: "XA",
+              start_date: "2026-05-02",
+              end_date: "2026-05-03",
+            },
+          ]),
           { status: 200 },
         ),
       ),
     );
     await expect(fetchManagedCompetitions(session)).resolves.toEqual([
-      { id: "InventedOpen2026", name: "Invented Open 2026" },
+      {
+        id: "InventedOpen2026",
+        name: "Invented Open 2026",
+        city: "Exampleville",
+        countryIso2: "XA",
+        startDate: "2026-05-02",
+        endDate: "2026-05-03",
+      },
     ]);
   });
 
@@ -104,13 +128,13 @@ describe("authenticated WCA API", () => {
       id: "InventedOpen2026",
       persons: [{ wcaUserId: 42, roles: ["organizer"] }],
     } as unknown as Competition;
-    const user = { id: 42, name: "Example Manager", wcaId: null };
+    const user = { id: 42, name: "Example Manager", wcaId: null, avatarUrl: null };
     expect(hasCompetitionPermissionHint(user, competition, [])).toBe(true);
     expect(
       hasCompetitionPermissionHint(
         { ...user, id: 99 },
         competition,
-        [{ id: competition.id, name: "Invented Open 2026" }],
+        [{ id: competition.id }],
       ),
     ).toBe(true);
     expect(hasCompetitionPermissionHint({ ...user, id: 99 }, competition, [])).toBe(false);
