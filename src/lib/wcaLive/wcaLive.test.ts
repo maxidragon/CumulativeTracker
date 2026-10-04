@@ -22,6 +22,7 @@ const group: CompetitionGroup = {
       eventId: "333bf",
       eventName: "3x3x3 Blindfolded",
       roundNumber: 1,
+      roundLabel: "Final",
       format: "3",
       cutoff: null,
       registered: true,

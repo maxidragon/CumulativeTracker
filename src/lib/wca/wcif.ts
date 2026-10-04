@@ -30,6 +30,8 @@ const EVENT_NAMES: Record<EventId, string> = {
 export type CompetitionRound = RoundPlan & {
   eventName: string;
   roundNumber: number;
+  /** "First round", "Second round", …, "Final", as WCA Live names rounds. */
+  roundLabel: string;
 };
 
 export type CompetitionGroup = {
@@ -44,12 +46,23 @@ function roundNumber(roundId: string): number {
   return match ? Number(match[1]) : 1;
 }
 
-function toCompetitionRound(eventId: EventId, round: Round): CompetitionRound {
+function roundLabel(number: number, roundCount: number): string {
+  if (number === roundCount) return "Final";
+  return ["First round", "Second round", "Third round"][number - 1] ?? `Round ${number}`;
+}
+
+function toCompetitionRound(
+  eventId: EventId,
+  round: Round,
+  roundCount: number,
+): CompetitionRound {
+  const number = roundNumber(round.id);
   return {
     roundId: round.id,
     eventId,
     eventName: EVENT_NAMES[eventId],
-    roundNumber: roundNumber(round.id),
+    roundNumber: number,
+    roundLabel: roundLabel(number, roundCount),
     format: round.format,
     cutoff:
       round.cutoff && round.cutoff.attemptResult > 0
@@ -63,10 +76,10 @@ function toCompetitionRound(eventId: EventId, round: Round): CompetitionRound {
 }
 
 export function extractCompetitionGroups(wcif: Competition): CompetitionGroup[] {
-  const roundsById = new Map<string, { eventId: EventId; round: Round }>();
+  const roundsById = new Map<string, { eventId: EventId; round: Round; roundCount: number }>();
   for (const event of wcif.events) {
     for (const round of event.rounds) {
-      roundsById.set(round.id, { eventId: event.id, round });
+      roundsById.set(round.id, { eventId: event.id, round, roundCount: event.rounds.length });
     }
   }
 
@@ -84,7 +97,9 @@ export function extractCompetitionGroups(wcif: Competition): CompetitionGroup[] 
 
       const rounds = roundIds.flatMap((roundId) => {
         const found = roundsById.get(roundId);
-        return found ? [toCompetitionRound(found.eventId, found.round)] : [];
+        return found
+          ? [toCompetitionRound(found.eventId, found.round, found.roundCount)]
+          : [];
       });
       if (rounds.length === 0) continue;
 
@@ -103,7 +118,7 @@ export function extractCompetitionGroups(wcif: Competition): CompetitionGroup[] 
 export function unsupportedRounds(wcif: Competition): CompetitionRound[] {
   return wcif.events.flatMap((event) =>
     UNSUPPORTED_EVENT_IDS.has(event.id)
-      ? event.rounds.map((round) => toCompetitionRound(event.id, round))
+      ? event.rounds.map((round) => toCompetitionRound(event.id, round, event.rounds.length))
       : [],
   );
 }
@@ -169,6 +184,7 @@ export function createCompetitionBudget(
 
 export function groupTitle(group: CompetitionGroup): string {
   return group.rounds
-    .map(({ eventName, roundNumber }) => `${eventName} · Round ${roundNumber}`)
+    .map(({ eventName, roundLabel }) => `${eventName} · ${roundLabel}`)
     .join(" + ");
 }
+

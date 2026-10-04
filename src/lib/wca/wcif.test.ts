@@ -4,6 +4,7 @@ import {
   competitorsForGroup,
   createCompetitionBudget,
   extractCompetitionGroups,
+  groupTitle,
   plansForCompetitor,
   unsupportedRounds,
 } from ".";
@@ -146,5 +147,11 @@ describe("WCIF cumulative groups", () => {
 
   it("reports unsupported untimed input events", () => {
     expect(unsupportedRounds(fixture).map(({ eventId }) => eventId)).toEqual(["333fm"]);
+  });
+
+  it("titles a group with WCA Live round names", () => {
+    const group = extractCompetitionGroups(fixture)[0];
+    if (!group) throw new Error("Fixture group missing.");
+    expect(groupTitle(group)).toBe("3x3x3 Blindfolded · Final + 4x4x4 Blindfolded · Final");
   });
 });
