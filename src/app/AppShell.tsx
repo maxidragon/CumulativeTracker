@@ -1,8 +1,11 @@
+import { Calculate } from "@mui/icons-material";
 import { AppBar, Box, Button, Container, Toolbar, Typography } from "@mui/material";
 import { Link, Outlet } from "react-router-dom";
 import { AuthControls, AuthNotice } from "../features/auth/AuthControls";
+import { useAuthStore } from "../features/auth/store";
 
 export function AppShell() {
+  const session = useAuthStore((state) => state.session);
   return (
     <Box sx={{ minHeight: "100dvh" }}>
       <AppBar
@@ -19,10 +22,22 @@ export function AppShell() {
             <Typography
               color="text.primary"
               component={Link}
-              sx={{ fontWeight: 800, textDecoration: "none" }}
+              sx={{
+                alignItems: "center",
+                display: "flex",
+                fontWeight: 800,
+                gap: 1,
+                textDecoration: "none",
+              }}
               to="/"
               variant="h6"
             >
+              <Box
+                alt=""
+                component="img"
+                src={`${import.meta.env.BASE_URL}favicon.svg`}
+                sx={{ display: "block", height: 28, width: 28 }}
+              />
               <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>
                 Cumulative Tracker
               </Box>
@@ -30,11 +45,22 @@ export function AppShell() {
                 Tracker
               </Box>
             </Typography>
-            <Box sx={{ flexGrow: 1 }} />
-            <AuthControls />
-            <Button color="inherit" component={Link} to="/settings">
-              Settings
+            <Button
+              color="inherit"
+              component={Link}
+              startIcon={<Calculate />}
+              sx={{ ml: { xs: 1, sm: 3 } }}
+              to="/calculator"
+            >
+              Calculator
             </Button>
+            <Box sx={{ flexGrow: 1 }} />
+            {session ? null : (
+              <Button color="inherit" component={Link} to="/settings">
+                Settings
+              </Button>
+            )}
+            <AuthControls />
           </Toolbar>
         </Container>
       </AppBar>

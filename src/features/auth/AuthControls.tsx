@@ -1,6 +1,18 @@
 import { AccountCircle } from "@mui/icons-material";
-import { Alert, Button, CircularProgress, Stack, Tooltip, Typography } from "@mui/material";
-import { useEffect } from "react";
+import {
+  Alert,
+  Avatar,
+  Button,
+  CircularProgress,
+  Divider,
+  IconButton,
+  Menu,
+  MenuItem,
+  Tooltip,
+  Typography,
+} from "@mui/material";
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { beginWcaSignIn, oauthClientId } from "./oauth";
 import { useCurrentUser } from "./api";
 import { useAuthStore } from "./store";
@@ -12,6 +24,7 @@ export function AuthControls() {
   const expireSession = useAuthStore((state) => state.expireSession);
   const user = useCurrentUser();
   const configured = oauthClientId() !== "";
+  const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
 
   useEffect(() => {
     if (!session) return;
@@ -50,20 +63,49 @@ export function AuthControls() {
     );
   }
 
+  const name = user.data?.name ?? "WCA account";
   return (
-    <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-      {user.isLoading ? <CircularProgress size={20} /> : null}
-      <Typography
-        noWrap
-        sx={{ display: { xs: "none", sm: "block" }, maxWidth: 180 }}
-        variant="body2"
+    <>
+      <IconButton
+        aria-controls={menuAnchor ? "account-menu" : undefined}
+        aria-expanded={menuAnchor ? "true" : undefined}
+        aria-haspopup="true"
+        aria-label={`Account: ${name}`}
+        onClick={(event) => setMenuAnchor(event.currentTarget)}
       >
-        {user.data ? user.data.name : "WCA signed in"}
-      </Typography>
-      <Button color="inherit" onClick={signOut}>
-        Sign out
-      </Button>
-    </Stack>
+        {user.isLoading ? (
+          <CircularProgress size={32} />
+        ) : (
+          <Avatar alt={name} src={user.data?.avatarUrl ?? undefined} sx={{ height: 32, width: 32 }}>
+            {name.charAt(0)}
+          </Avatar>
+        )}
+      </IconButton>
+      <Menu
+        anchorEl={menuAnchor}
+        anchorOrigin={{ horizontal: "right", vertical: "bottom" }}
+        id="account-menu"
+        onClose={() => setMenuAnchor(null)}
+        open={menuAnchor !== null}
+        transformOrigin={{ horizontal: "right", vertical: "top" }}
+      >
+        <Typography noWrap sx={{ maxWidth: 240, px: 2, py: 1 }} variant="subtitle2">
+          {name}
+        </Typography>
+        <Divider />
+        <MenuItem component={Link} onClick={() => setMenuAnchor(null)} to="/settings">
+          Settings
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            setMenuAnchor(null);
+            signOut();
+          }}
+        >
+          Sign out
+        </MenuItem>
+      </Menu>
+    </>
   );
 }
 
