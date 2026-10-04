@@ -153,9 +153,8 @@ export function clearCalculatorAttempts(state: CalculatorState): CalculatorState
   return { ...state, attempts: createAttempts(state.rounds, customAttemptCount) };
 }
 
-const defaultPreset = calculatorPresets[0];
-if (!defaultPreset) throw new Error("At least one calculator preset is required.");
-export const defaultCalculatorState = stateFromPreset(defaultPreset);
+/** Five attempts and 20:00 — an average of 5 under a common cumulative limit. */
+export const defaultCalculatorState = createCustomCalculatorState(undefined, 5, 120_000);
 
 export function calculatorGroupKey(state: CalculatorState): string {
   return groupKey(state.rounds.map(({ roundId }) => roundId));

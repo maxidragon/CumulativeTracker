@@ -4,6 +4,7 @@ import {
   calculatorLimitPresets,
   clearCalculatorAttempts,
   createCustomCalculatorState,
+  defaultCalculatorState,
   stateFromPreset,
 } from "./model";
 
@@ -38,6 +39,11 @@ describe("calculator state", () => {
     expect(createCustomCalculatorState(undefined, 3, 60 * 6_000).limitCentiseconds).toBe(
       360_000,
     );
+  });
+
+  it("starts with five attempts under a 20:00 limit", () => {
+    expect(defaultCalculatorState.attempts).toHaveLength(5);
+    expect(defaultCalculatorState.limitCentiseconds).toBe(120_000);
   });
 
   it("supports a custom number of attempts", () => {

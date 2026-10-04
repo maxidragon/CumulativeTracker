@@ -64,7 +64,7 @@ describe("CalculatorScreen", () => {
     const limit = screen.getByLabelText("Cumulative limit");
     fireEvent.focus(limit);
     fireEvent.blur(limit);
-    expect(useCalculatorStore.getState().calculator.presetId).toBe("333bf-bo3-20");
+    expect(useCalculatorStore.getState().calculator).toBe(defaultCalculatorState);
   });
 
   it("changes the calculator to a common minute limit", async () => {
@@ -92,7 +92,7 @@ describe("CalculatorScreen", () => {
     renderCalculator();
     await user.click(screen.getByRole("button", { name: "Stopped at the limit" }));
     expect(screen.getByRole("dialog")).toHaveTextContent(
-      "Attempt 1 will be recorded as DNF at exactly 20:00.00, and the attempts after it as DNS.",
+      "Attempt 1 will be recorded as DNF at exactly 20:00.00, and the other untaken attempts as DNS.",
     );
     expect(screen.getByRole("button", { name: "Record DNF" })).toBeEnabled();
     await user.click(screen.getByRole("button", { name: "Cancel" }));
@@ -116,7 +116,7 @@ describe("CalculatorScreen", () => {
 
     const { calculator } = useCalculatorStore.getState();
     expect(calculator.attempts.every(({ outcome }) => outcome === "skipped")).toBe(true);
-    expect(calculator.attempts).toHaveLength(3);
+    expect(calculator.attempts).toHaveLength(5);
     expect(calculator.limitCentiseconds).toBe(360_000);
     expect(screen.getByLabelText("Attempt 1")).toHaveValue("");
   });

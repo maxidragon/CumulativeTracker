@@ -366,7 +366,7 @@ export function CalculatorScreen() {
                   kind: "stop",
                   roundId: nextAttempt.roundId,
                   attemptNumber: nextAttempt.attemptNumber,
-                  description: `Attempt ${nextAttempt.attemptNumber} will be recorded as DNF at exactly ${formatTime(summary.remainingCentiseconds)}, and the attempts after it as DNS.`,
+                  description: `Attempt ${nextAttempt.attemptNumber} will be recorded as DNF at exactly ${formatTime(summary.remainingCentiseconds)}${calculator.attempts.filter(({ outcome }) => outcome === "skipped").length > 1 ? ", and the other untaken attempts as DNS" : ""}.`,
                 });
               }}
               variant="outlined"
