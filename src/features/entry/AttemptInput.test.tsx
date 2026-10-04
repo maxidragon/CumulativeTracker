@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { TrackedAttempt } from "../../lib/attempt";
 import { AttemptInput } from "./AttemptInput";
@@ -150,6 +151,21 @@ describe("AttemptInput", () => {
     expect(onReorder).toHaveBeenLastCalledWith("later");
   });
 
+  it("clears a fully selected time with Backspace and replaces it when typing", async () => {
+    const user = userEvent.setup();
+    render(<AttemptInput attempt={skippedAttempt} onCommit={vi.fn()} />);
+    const input = screen.getByLabelText("Attempt 2");
+    await user.click(input);
+    await user.keyboard("25000");
+    expect(input).toHaveValue("2:50.00");
+
+    await user.keyboard("{Control>}a{/Control}{Backspace}");
+    expect(input).toHaveValue("");
+
+    await user.keyboard("25000{Control>}a{/Control}7");
+    expect(input).toHaveValue("0.07");
+  });
+
   it("leaves the field with Escape once there is nothing to revert", () => {
     const onExit = vi.fn();
     render(<AttemptInput attempt={skippedAttempt} onCommit={vi.fn()} onExit={onExit} />);
@@ -166,6 +182,25 @@ describe("AttemptInput", () => {
     for (const name of ["DNF", "DNS"]) {
       expect(screen.getByRole("button", { name })).toHaveAttribute("tabindex", "-1");
     }
+  });
+
+  it("flags a solve of exactly the cap as a DNF, but not a DNF at the cap", () => {
+    const { rerender } = render(
+      <AttemptInput
+        attempt={{ ...skippedAttempt, outcome: "ok", centiseconds: 15_000 }}
+        capCentiseconds={15_000}
+        onCommit={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("Reaches the cap, so this is a DNF")).toBeInTheDocument();
+    rerender(
+      <AttemptInput
+        attempt={{ ...skippedAttempt, outcome: "dnf", centiseconds: 15_000, enteredAt: "x" }}
+        capCentiseconds={15_000}
+        onCommit={vi.fn()}
+      />,
+    );
+    expect(screen.queryByText("Reaches the cap, so this is a DNF")).not.toBeInTheDocument();
   });
 
   it("warns without blocking a time over the cap", () => {

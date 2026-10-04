@@ -32,6 +32,8 @@ export type AttemptInputProps = {
   onExit?: () => void;
   /** Alt+↑ / Alt+↓; only where attempts can be reordered. */
   onReorder?: (direction: "earlier" | "later") => void;
+  /** Where the row is crowded, put DNF and DNS under the field on a phone. */
+  stackToggles?: boolean;
 };
 
 function inputValue(attempt: TrackedAttempt): string {
@@ -49,6 +51,7 @@ export function AttemptInput({
   onMove,
   onExit,
   onReorder,
+  stackToggles = false,
 }: AttemptInputProps) {
   const [draftInput, setDraftInput] = useState(() => inputValue(attempt));
   const [draftOutcome, setDraftOutcome] = useState(attempt.outcome);
@@ -128,6 +131,12 @@ export function AttemptInput({
 
   const removeLastDigit = () => setDraftInput(formatTimeInput(draftDigits.slice(0, -1)));
 
+  /** Digits fill from the right, so a selection cannot be edited in place: it is replaced. */
+  const hasSelection = (target: EventTarget) =>
+    target instanceof HTMLInputElement &&
+    target.selectionStart !== null &&
+    target.selectionStart !== target.selectionEnd;
+
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     const vertical = event.key === "ArrowUp" || event.key === "ArrowDown";
     if (vertical && event.altKey) {
@@ -155,12 +164,18 @@ export function AttemptInput({
     }
     if (/^\d$/.test(event.key)) {
       event.preventDefault();
-      appendDigits(event.key);
+      if (hasSelection(event.target)) {
+        setDraftInput(formatTimeInput(event.key));
+        if (draftOutcome === "skipped") setDraftOutcome("ok");
+      } else {
+        appendDigits(event.key);
+      }
       return;
     }
-    if (event.key === "Backspace") {
+    if (event.key === "Backspace" || event.key === "Delete") {
       event.preventDefault();
-      removeLastDigit();
+      if (hasSelection(event.target)) setDraftInput("");
+      else if (event.key === "Backspace") removeLastDigit();
       return;
     }
     if (event.key === "Enter") {
@@ -184,8 +199,10 @@ export function AttemptInput({
 
   const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
     const nativeEvent = event.nativeEvent as InputEvent;
-    if (nativeEvent.inputType === "deleteContentBackward") {
-      removeLastDigit();
+    if (nativeEvent.inputType.startsWith("delete")) {
+      // A soft keyboard deleting a selection leaves nothing behind; a single delete drops a digit.
+      if (event.target.value === "") setDraftInput("");
+      else removeLastDigit();
       return;
     }
     if (nativeEvent.data && /^\d+$/.test(nativeEvent.data)) {
@@ -203,13 +220,21 @@ export function AttemptInput({
 
   const isOverCap =
     capCentiseconds !== undefined && elapsed !== null && elapsed > capCentiseconds;
-  // Only what needs action: an untimed DNF, or a time over the cap.
+  // A1a4: a solve must end before the limit is reached, so a result of exactly the cap is a DNF.
+  const solvedAtCap =
+    capCentiseconds !== undefined &&
+    elapsed === capCentiseconds &&
+    draftOutcome !== "dnf" &&
+    draftOutcome !== "dns";
+  // Only what needs action: an untimed DNF, a solve at the cap, or a time over the cap.
   const helperText =
     draftOutcome === "dnf" && elapsed === null
       ? "Elapsed time not recorded"
-      : isOverCap
-        ? `Over the ${formatTime(capCentiseconds)} cap`
-        : null;
+      : solvedAtCap
+        ? "Reaches the cap, so this is a DNF"
+        : isOverCap
+          ? `Over the ${formatTime(capCentiseconds)} cap`
+          : null;
 
   // Out of the tab order so Tab goes field to field, as in WCA Live; D and S toggle these
   // from the field.
@@ -219,7 +244,7 @@ export function AttemptInput({
       disabled={disabled}
       onChange={onToggle}
       selected={draftOutcome === outcome}
-      sx={{ fontWeight: 700, px: 2 }}
+      sx={{ flex: { xs: stackToggles ? 1 : "none", sm: "none" }, fontWeight: 700, px: 2 }}
       tabIndex={-1}
       value={outcome}
     >
@@ -229,7 +254,11 @@ export function AttemptInput({
 
   return (
     <FormControl disabled={disabled} fullWidth>
-      <Stack direction="row" spacing={1} sx={{ alignItems: "stretch" }}>
+      <Stack
+        direction={{ xs: stackToggles ? "column" : "row", sm: "row" }}
+        spacing={1}
+        sx={{ alignItems: "stretch" }}
+      >
         <TextField
           disabled={disabled || draftOutcome === "dns"}
           label={label}
@@ -254,12 +283,14 @@ export function AttemptInput({
           type="tel"
           value={draftInput}
         />
-        {outcomeToggle("dnf", toggleDnf)}
-        {outcomeToggle("dns", toggleDns)}
+        <Stack direction="row" spacing={1}>
+          {outcomeToggle("dnf", toggleDnf)}
+          {outcomeToggle("dns", toggleDns)}
+        </Stack>
       </Stack>
       {helperText ? (
         <FormHelperText
-          sx={{ mx: 0, ...(isOverCap ? { color: "warning.main" } : {}) }}
+          sx={{ mx: 0, ...(isOverCap || solvedAtCap ? { color: "warning.main" } : {}) }}
         >
           {helperText}
         </FormHelperText>
