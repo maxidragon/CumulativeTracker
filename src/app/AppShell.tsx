@@ -4,6 +4,9 @@ import { Link, Outlet } from "react-router-dom";
 import { AuthControls, AuthNotice } from "../features/auth/AuthControls";
 import { useAuthStore } from "../features/auth/store";
 
+// Router links are anchors: pin the colour so a visited link never turns purple.
+const navLink = { color: "text.primary", "&:visited": { color: "text.primary" } } as const;
+
 export function AppShell() {
   const session = useAuthStore((state) => state.session);
   return (
@@ -20,9 +23,9 @@ export function AppShell() {
             sx={{ flexWrap: { xs: "wrap", sm: "nowrap" }, minHeight: 56, py: 0.5 }}
           >
             <Typography
-              color="text.primary"
               component={Link}
               sx={{
+                ...navLink,
                 alignItems: "center",
                 display: "flex",
                 fontWeight: 800,
@@ -46,17 +49,16 @@ export function AppShell() {
               </Box>
             </Typography>
             <Button
-              color="inherit"
               component={Link}
               startIcon={<Calculate />}
-              sx={{ ml: { xs: 1, sm: 3 } }}
+              sx={{ ...navLink, ml: { xs: 1, sm: 3 } }}
               to="/calculator"
             >
               Calculator
             </Button>
             <Box sx={{ flexGrow: 1 }} />
             {session ? null : (
-              <Button color="inherit" component={Link} to="/settings">
+              <Button component={Link} sx={navLink} to="/settings">
                 Settings
               </Button>
             )}
