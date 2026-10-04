@@ -1,13 +1,6 @@
-import {
-  CheckCircleOutlined,
-  ErrorOutlined,
-  HelpOutlined,
-  RadioButtonUnchecked,
-  WarningAmber,
-} from "@mui/icons-material";
+import { CheckCircle, ErrorOutlined } from "@mui/icons-material";
 import {
   Box,
-  Chip,
   Link as MuiLink,
   Stack,
   Table,
@@ -19,53 +12,29 @@ import {
   Typography,
 } from "@mui/material";
 import type { Person } from "@wca/helpers";
-import { useEffect, useRef, type ReactElement } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { formatTime } from "../../lib/attempt";
 import { attemptsForFormat, type Budget, type BudgetSummary } from "../../lib/cumulative";
 import type { CompetitionRound } from "../../lib/wca";
 import { EventIcon } from "../../components/EventIcon";
-import { SyncStatus } from "./SyncStatus";
-import {
-  budgetSyncLabel,
-  countryFlag,
-  formatAttemptResult,
-  type CompetitorStatus,
-} from "./viewModel";
+import { budgetSyncLabel, countryFlag, formatAttemptResult } from "./viewModel";
 
 export type CompetitorRow = {
   person: Person;
   budget: Budget;
   summary: BudgetSummary;
-  status: CompetitorStatus;
 };
 
-const statusColor = {
-  "Not started": "default",
-  "On track": "success",
-  Tight: "warning",
-  Exhausted: "error",
-  Incomplete: "warning",
-} as const;
-
-const statusIcon: Record<CompetitorStatus, ReactElement> = {
-  "Not started": <RadioButtonUnchecked aria-hidden="true" />,
-  "On track": <CheckCircleOutlined aria-hidden="true" />,
-  Tight: <WarningAmber aria-hidden="true" />,
-  Exhausted: <ErrorOutlined aria-hidden="true" />,
-  Incomplete: <HelpOutlined aria-hidden="true" />,
-};
-
-function StatusChip({ status }: { status: CompetitorStatus }) {
-  return (
-    <Chip
-      color={statusColor[status]}
-      icon={statusIcon[status]}
-      label={status}
-      size="small"
-      variant="outlined"
-    />
-  );
+/** Every entered attempt is on WCA Live: a tick; a failed submission: a warning. */
+function LiveState({ budget }: { budget: Budget }) {
+  const sync = budgetSyncLabel(budget);
+  if (sync === "On WCA Live") {
+    return <CheckCircle aria-label="On WCA Live" color="success" fontSize="small" />;
+  }
+  if (sync === "Failed") {
+    return <ErrorOutlined aria-label="WCA Live submission failed" color="error" fontSize="small" />;
+  }
+  return null;
 }
 
 type CompetitorTableProps = {
@@ -74,8 +43,6 @@ type CompetitorTableProps = {
   rounds: CompetitionRound[];
   liveMode: boolean;
   selectedRegistrantId: number | null;
-  /** Picked with ↑/↓ in the search, not opened yet. */
-  highlightedRegistrantId: number | null;
   linkTo: (registrantId: number) => string;
 };
 
@@ -92,14 +59,9 @@ export function CompetitorTable({
   rounds,
   liveMode,
   selectedRegistrantId,
-  highlightedRegistrantId,
   linkTo,
 }: CompetitorTableProps) {
   const navigate = useNavigate();
-  const highlightedRef = useRef<HTMLTableRowElement>(null);
-  useEffect(() => {
-    highlightedRef.current?.scrollIntoView({ block: "nearest" });
-  }, [highlightedRegistrantId]);
   const multiRound = rounds.length > 1;
   const columns = rounds.map((round) => ({
     round,
@@ -108,22 +70,24 @@ export function CompetitorTable({
       (_, index) => index + 1,
     ),
   }));
+  const used = ({ summary }: CompetitorRow) => formatTime(summary.usedCentiseconds);
   const remaining = ({ summary }: CompetitorRow) =>
     cumulative
-      ? `${summary.isUpperBound ? "≤ " : ""}${formatTime(Math.max(0, summary.remainingCentiseconds), { compact: true })}`
+      ? `${summary.isUpperBound ? "≤ " : ""}${formatTime(Math.max(0, summary.remainingCentiseconds))}`
       : "—";
-  const nextCap = ({ summary }: CompetitorRow) =>
-    formatTime(Math.max(0, summary.capForNextAttemptCentiseconds), { compact: true });
   const budgetHeaders = (rowSpan: number) => (
     <>
       <TableCell align="right" rowSpan={rowSpan}>
-        Remaining
+        Used
       </TableCell>
       <TableCell align="right" rowSpan={rowSpan}>
-        Next cap
+        Remaining
       </TableCell>
-      <TableCell rowSpan={rowSpan}>Status</TableCell>
-      {liveMode ? <TableCell rowSpan={rowSpan}>Sync</TableCell> : null}
+      {liveMode ? (
+        <TableCell align="center" rowSpan={rowSpan}>
+          WCA Live
+        </TableCell>
+      ) : null}
     </>
   );
 
@@ -183,23 +147,14 @@ export function CompetitorTable({
           </TableHead>
           <TableBody>
             {rows.map((row) => {
-              const { person, budget, status } = row;
-              const sync = budgetSyncLabel(budget);
-              const highlighted = person.registrantId === highlightedRegistrantId;
+              const { person, budget } = row;
               return (
                 <TableRow
-                  aria-current={highlighted ? "true" : undefined}
                   hover
                   key={person.registrantId}
                   onClick={() => void navigate(linkTo(person.registrantId))}
-                  ref={highlighted ? highlightedRef : undefined}
                   selected={person.registrantId === selectedRegistrantId}
-                  sx={{
-                    cursor: "pointer",
-                    ...(highlighted
-                      ? { outline: 2, outlineColor: "primary.main", outlineOffset: -2 }
-                      : {}),
-                  }}
+                  sx={{ cursor: "pointer" }}
                 >
                   <TableCell align="right" sx={numeric}>
                     {person.registrantId}
@@ -239,16 +194,15 @@ export function CompetitorTable({
                     }),
                   )}
                   <TableCell align="right" sx={numeric}>
-                    {remaining(row)}
+                    {used(row)}
                   </TableCell>
                   <TableCell align="right" sx={{ ...numeric, fontWeight: 700 }}>
-                    {nextCap(row)}
-                  </TableCell>
-                  <TableCell>
-                    <StatusChip status={status} />
+                    {remaining(row)}
                   </TableCell>
                   {liveMode ? (
-                    <TableCell>{sync ? <SyncStatus label={sync} /> : "—"}</TableCell>
+                    <TableCell align="center" sx={{ lineHeight: 0 }}>
+                      <LiveState budget={budget} />
+                    </TableCell>
                   ) : null}
                 </TableRow>
               );
@@ -263,8 +217,7 @@ export function CompetitorTable({
         sx={{ display: { xs: "flex", md: "none" }, listStyle: "none", m: 0, p: 0 }}
       >
         {rows.map((row) => {
-          const { person, budget, status } = row;
-          const sync = budgetSyncLabel(budget);
+          const { person, budget } = row;
           return (
             <Box
               component="li"
@@ -282,13 +235,10 @@ export function CompetitorTable({
                     {countryFlag(person.countryIso2)} {person.name}
                   </MuiLink>
                   <Typography color="text.secondary" variant="body2">
-                    #{person.registrantId} · remaining {remaining(row)} · cap {nextCap(row)}
+                    #{person.registrantId} · used {used(row)} · remaining {remaining(row)}
                   </Typography>
                 </Box>
-                <Stack spacing={0.5} sx={{ alignItems: "flex-end" }}>
-                  <StatusChip status={status} />
-                  {liveMode && sync ? <SyncStatus label={sync} /> : null}
-                </Stack>
+                {liveMode ? <LiveState budget={budget} /> : null}
               </Stack>
             </Box>
           );

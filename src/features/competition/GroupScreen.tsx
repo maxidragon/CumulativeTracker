@@ -1,27 +1,25 @@
-import { Keyboard, Search } from "@mui/icons-material";
+import { Close, Keyboard, Search } from "@mui/icons-material";
 import {
   Alert,
+  Autocomplete,
   Box,
-  Breadcrumbs,
   Button,
-  Chip,
+  IconButton,
   InputAdornment,
   Link as MuiLink,
-  Paper,
   Stack,
   TextField,
   Typography,
 } from "@mui/material";
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   competitorsForGroup,
   createCompetitionBudget,
   extractCompetitionGroups,
-  groupTitle,
-  plansForCompetitor,
 } from "../../lib/wca";
 import { reconcileLiveBudget } from "../../lib/wcaLive";
+import { EventIcon } from "../../components/EventIcon";
 import { useAuthStore } from "../auth/store";
 import { useLiveResults } from "../live/hooks";
 import { activeLiveToken } from "../live/mode";
@@ -31,14 +29,29 @@ import { CompetitorTable, type CompetitorRow } from "./CompetitorTable";
 import { ShortcutsDialog } from "./ShortcutsDialog";
 import { useCompetitionData } from "./data";
 import { trackingBudgetKey, useTrackingStore } from "./trackingStore";
-import { competitorStatus, summaryForGroup, unsyncedAttemptCount } from "./viewModel";
+import {
+  countryFlag,
+  summaryForGroup,
+  unsyncedAttemptCount,
+} from "./viewModel";
 
-function matchesSearch({ person }: CompetitorRow, needle: string): boolean {
-  return (
-    needle === "" ||
-    person.name.toLocaleLowerCase().includes(needle) ||
-    String(person.registrantId).includes(needle)
-  );
+const MAX_SUGGESTIONS = 8;
+
+function foldName(value: string): string {
+  return value.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLocaleLowerCase();
+}
+
+/** A registrant id matches exactly; anything else matches names containing it. */
+function competitorSuggestions(rows: CompetitorRow[], input: string): CompetitorRow[] {
+  const needle = input.trim();
+  if (needle === "") return [];
+  if (/^\d+$/.test(needle)) {
+    return rows.filter(({ person }) => String(person.registrantId) === needle);
+  }
+  const folded = foldName(needle);
+  return rows
+    .filter(({ person }) => foldName(person.name).includes(folded))
+    .slice(0, MAX_SUGGESTIONS);
 }
 
 /**
@@ -59,8 +72,8 @@ export function GroupScreen() {
   const liveToken = activeLiveToken(competitionId, tracking, session);
   const liveResults = useLiveResults(competitionId, liveToken !== null);
   const [search, setSearch] = useState("");
-  /** Row picked with ↑/↓ in the search; null lets Enter fall back to the best match. */
-  const [highlighted, setHighlighted] = useState<number | null>(null);
+  /** True while the field holds typed text; otherwise it shows the open competitor. */
+  const [editing, setEditing] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [focusRequest, setFocusRequest] = useState(0);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -124,14 +137,10 @@ export function GroupScreen() {
           person,
           budget,
           summary: summaryForGroup(group, budget),
-          status: competitorStatus(group, budget, plansForCompetitor(person, group)),
         };
       })
     : [];
-  const needle = search.trim().toLocaleLowerCase();
-  const rows = allRows
-    .filter((row) => matchesSearch(row, needle))
-    .sort(
+  const rows = [...allRows].sort(
       (left, right) =>
         left.summary.remainingCentiseconds - right.summary.remainingCentiseconds ||
         left.person.name.localeCompare(right.person.name),
@@ -143,33 +152,17 @@ export function GroupScreen() {
     ? allRows.reduce((total, { budget }) => total + unsyncedAttemptCount(budget), 0)
     : 0;
 
-  const highlightedRow = highlighted === null ? undefined : rows[highlighted];
+  const suggestions = competitorSuggestions(rows, search);
 
-  const handleSearchKey = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === "Escape") {
-      setSearch("");
-      setHighlighted(null);
-      return;
-    }
-    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-      event.preventDefault();
-      if (rows.length === 0) return;
-      const step = event.key === "ArrowDown" ? 1 : -1;
-      const from = highlighted ?? (step === 1 ? -1 : rows.length);
-      setHighlighted(Math.min(rows.length - 1, Math.max(0, from + step)));
-      return;
-    }
-    if (event.key !== "Enter") return;
-    event.preventDefault();
-    const match =
-      highlightedRow ??
-      rows.find(({ person }) => String(person.registrantId) === needle) ??
-      rows[0];
-    if (!match) return;
+  const stopEditing = () => {
+    setEditing(false);
     setSearch("");
-    setHighlighted(null);
+  };
+
+  const openCompetitor = (registrantId: number) => {
+    stopEditing();
     setFocusRequest((current) => current + 1);
-    void navigate(competitorPath(match.person.registrantId));
+    void navigate(competitorPath(registrantId));
   };
 
   return (
@@ -182,42 +175,72 @@ export function GroupScreen() {
       {query.data && group ? (
         <Stack spacing={3}>
           <Box>
-            <Breadcrumbs sx={{ mb: 0.5 }}>
-              <MuiLink
-                component={Link}
-                to={`/c/${encodeURIComponent(competitionId)}`}
-                underline="hover"
+            <MuiLink
+              component={Link}
+              to={`/c/${encodeURIComponent(competitionId)}`}
+              underline="hover"
+              variant="body2"
+            >
+              {query.data.wcif.name}
+            </MuiLink>
+            <Stack
+              direction={{ xs: "column", md: "row" }}
+              spacing={{ xs: 0.5, md: 2 }}
+              sx={{ alignItems: { md: "center" }, mt: 0.5 }}
+            >
+              <Typography
+                component="h1"
+                sx={{
+                  alignItems: "center",
+                  columnGap: 1,
+                  display: "flex",
+                  flexGrow: 1,
+                  flexWrap: "wrap",
+                  fontSize: { xs: 22, md: 28 },
+                  minWidth: 0,
+                }}
+                variant="h4"
               >
-                {query.data.wcif.name}
-              </MuiLink>
-              <Typography color="text.secondary">Group</Typography>
-            </Breadcrumbs>
-            <Typography component="h1" sx={{ fontSize: { xs: 24, md: 34 } }} variant="h4">
-              {groupTitle(group)}
-            </Typography>
-            <Stack direction="row" sx={{ alignItems: "center", flexWrap: "wrap", gap: 1, mt: 1 }}>
-              {liveToken ? <Chip color="primary" label="WCA Live mode" size="small" /> : null}
-              {liveToken && unsynced > 0 ? (
-                <Chip
-                  color="warning"
-                  label={`${unsynced} attempt${unsynced === 1 ? "" : "s"} not on WCA Live`}
-                  size="small"
-                  variant="outlined"
-                />
-              ) : null}
-              <Typography color="text.secondary" variant="body2">
-                {rows.length} competitor{rows.length === 1 ? "" : "s"} · sorted by time
-                remaining
+                {group.rounds.map((round, index) => (
+                  <Fragment key={round.roundId}>
+                    {index > 0 ? (
+                      <Box component="span" sx={{ color: "text.secondary" }}>
+                        +
+                      </Box>
+                    ) : null}
+                    <Box
+                      component="span"
+                      sx={{ alignItems: "center", display: "inline-flex", gap: 1 }}
+                    >
+                      <EventIcon eventId={round.eventId} eventName={round.eventName} size={28} />
+                      {round.eventName} · {round.roundLabel}
+                    </Box>
+                  </Fragment>
+                ))}
               </Typography>
-              <Box sx={{ flexGrow: 1 }} />
-              <Button
-                onClick={() => setShortcutsOpen(true)}
-                size="small"
-                startIcon={<Keyboard />}
-                sx={{ display: { xs: "none", md: "inline-flex" } }}
+              <Stack
+                direction="row"
+                spacing={2}
+                sx={{ alignItems: "center", flexShrink: 0, flexWrap: "wrap" }}
               >
-                Shortcuts (?)
-              </Button>
+                {liveToken && unsynced > 0 ? (
+                  <Typography color="warning.main" variant="body2">
+                    {unsynced} attempt{unsynced === 1 ? "" : "s"} not on WCA Live
+                  </Typography>
+                ) : null}
+                <Typography color="text.secondary" variant="body2">
+                  {rows.length} competitor{rows.length === 1 ? "" : "s"} · sorted by time
+                  remaining
+                </Typography>
+                <Button
+                  onClick={() => setShortcutsOpen(true)}
+                  size="small"
+                  startIcon={<Keyboard />}
+                  sx={{ display: { xs: "none", md: "inline-flex" } }}
+                >
+                  Shortcuts
+                </Button>
+              </Stack>
             </Stack>
           </Box>
 
@@ -238,37 +261,94 @@ export function GroupScreen() {
               },
             }}
           >
-            <Paper sx={{ p: { xs: 2, md: 3 } }} variant="outlined">
-              <Stack spacing={3}>
-                <TextField
-                  fullWidth
-                  helperText="Registrant id or name, ↑/↓ to pick, Enter to open. / jumps here."
-                  inputRef={searchRef}
-                  label="Find competitor (registrant id or name)"
-                  onChange={(event) => {
-                    setSearch(event.target.value);
-                    setHighlighted(null);
+            <Box>
+              <Stack spacing={2}>
+                <Autocomplete<CompetitorRow>
+                  autoHighlight
+                  filterOptions={(options) => options}
+                  getOptionKey={({ person }) => person.registrantId}
+                  getOptionLabel={({ person }) => person.name}
+                  inputValue={editing ? search : (selectedPerson?.name ?? "")}
+                  noOptionsText="No competitor matches"
+                  onChange={(_, row) => {
+                    if (row) openCompetitor(row.person.registrantId);
                   }}
-                  onKeyDown={handleSearchKey}
-                  slotProps={{
-                    input: {
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <Search aria-hidden="true" />
-                        </InputAdornment>
-                      ),
-                    },
+                  onBlur={stopEditing}
+                  onClose={(_, reason) => {
+                    // The list is open whenever there is text, so Escape lands here
+                    // rather than on clearOnEscape.
+                    if (reason === "escape") stopEditing();
                   }}
-                  value={search}
+                  onInputChange={(_, value, reason) => {
+                    if (reason !== "input") return;
+                    setEditing(true);
+                    setSearch(value);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Escape") stopEditing();
+                  }}
+                  open={editing && search.trim() !== ""}
+                  options={suggestions}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      inputRef={searchRef}
+                      label="Competitor"
+                      placeholder="Registrant id or name"
+                      slotProps={{
+                        ...params.slotProps,
+                        input: {
+                          ...params.slotProps.input,
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <Search aria-hidden="true" />
+                            </InputAdornment>
+                          ),
+                          endAdornment:
+                            selectedPerson && !editing ? (
+                              <InputAdornment position="end">
+                                <Typography color="text.secondary" sx={{ mr: 0.5 }}>
+                                  #{selectedPerson.registrantId}
+                                </Typography>
+                                <IconButton
+                                  aria-label="Close competitor"
+                                  edge="end"
+                                  onClick={() => void navigate(groupPath)}
+                                  size="small"
+                                >
+                                  <Close fontSize="small" />
+                                </IconButton>
+                              </InputAdornment>
+                            ) : (
+                              params.slotProps.input.endAdornment
+                            ),
+                        },
+                      }}
+                    />
+                  )}
+                  renderOption={({ key, ...props }, { person }) => (
+                    <Box component="li" key={key} {...props}>
+                      <Typography sx={{ flexGrow: 1, minWidth: 0 }} noWrap>
+                        {countryFlag(person.countryIso2)} {person.name}
+                      </Typography>
+                      <Typography color="text.secondary" sx={{ ml: 2 }} variant="body2">
+                        #{person.registrantId}
+                      </Typography>
+                    </Box>
+                  )}
+                  value={null}
                 />
                 {selectedPerson ? (
                   <CompetitorPanel
-                    closeTo={groupPath}
                     competitionId={competitionId}
                     focusRequest={focusRequest}
                     group={group}
                     liveToken={liveToken}
-                    onDone={() => searchRef.current?.focus()}
+                    onConfirmed={() => {
+                      void navigate(groupPath);
+                      searchRef.current?.focus();
+                    }}
+                    onExit={() => searchRef.current?.focus()}
                     person={selectedPerson}
                   />
                 ) : selectedRegistrantId !== null ? (
@@ -276,13 +356,12 @@ export function GroupScreen() {
                     Registrant #{registrantParam} is not in this group.
                   </Alert>
                 ) : (
-                  <Typography color="text.secondary">
-                    Pick a competitor to enter their attempts: type their registrant id above,
-                    or click their row in the table.
+                  <Typography color="text.secondary" variant="body2">
+                    Type a registrant id and press Enter, or click a row.
                   </Typography>
                 )}
               </Stack>
-            </Paper>
+            </Box>
 
             <Box sx={{ display: { xs: selectedPerson ? "none" : "block", md: "block" } }}>
               <CompetitorTable
@@ -290,13 +369,9 @@ export function GroupScreen() {
                 linkTo={competitorPath}
                 liveMode={liveToken !== null}
                 rounds={group.rounds}
-                highlightedRegistrantId={highlightedRow?.person.registrantId ?? null}
                 rows={rows}
                 selectedRegistrantId={selectedRegistrantId}
               />
-              {rows.length === 0 ? (
-                <Typography color="text.secondary">No competitors match this search.</Typography>
-              ) : null}
             </Box>
           </Box>
           <ShortcutsDialog onClose={() => setShortcutsOpen(false)} open={shortcutsOpen} />

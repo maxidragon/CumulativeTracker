@@ -26,6 +26,16 @@ import { summaryForGroup } from "./viewModel";
 
 export type CompetitorAction = "stop" | "dns" | "clear";
 
+function isPending(attempt: TrackedAttempt): boolean {
+  return (
+    attempt.outcome !== "skipped" &&
+    !attempt.estimated &&
+    attempt.remoteResult === undefined &&
+    attempt.syncStatus !== "synced" &&
+    attempt.syncStatus !== "sending"
+  );
+}
+
 function sameAttempt(left: TrackedAttempt, right: TrackedAttempt): boolean {
   return left.roundId === right.roundId && left.attemptNumber === right.attemptNumber;
 }
@@ -146,9 +156,25 @@ export function useCompetitorEntry(
 
   const commitAttempt = (attempt: TrackedAttempt) => {
     updateAttempt(competitionId, group.key, person.registrantId, attempt);
-    if (canSubmit && attempt.outcome !== "skipped" && !attempt.estimated) {
-      void submitAttempt({ ...attempt, syncStatus: "local" });
-    }
+  };
+
+  const storedAttempts = () =>
+    useTrackingStore.getState().competitions[competitionId]?.budgets[
+      trackingBudgetKey(group.key, person.registrantId)
+    ]?.attempts ?? [];
+
+  /**
+   * Sends every entered attempt WCA Live does not have yet, one at a time as it expects;
+   * conflicts wait for an explicit choice. Reads the store rather than this render, so an
+   * attempt committed by the same Enter press is included. Resolves true when nothing is
+   * left needing attention, so the scorecard can be closed.
+   */
+  const submitPending = async (): Promise<boolean> => {
+    if (!canSubmit) return false;
+    for (const attempt of storedAttempts().filter(isPending)) await submitAttempt(attempt);
+    return storedAttempts().every(
+      (attempt) => attempt.syncStatus !== "failed" && attempt.remoteResult === undefined,
+    );
   };
 
   const runAction = (action: CompetitorAction) => {
@@ -163,16 +189,6 @@ export function useCompetitorEntry(
         attempts: dnsRemainingInRound(budget.attempts, nextAttempt.roundId),
       };
       replaceBudget(competitionId, next);
-      if (!canSubmit) return;
-      for (const attempt of next.attempts) {
-        if (
-          attempt.roundId === nextAttempt.roundId &&
-          attempt.outcome === "dns" &&
-          attempt.syncStatus === "local"
-        ) {
-          void submitAttempt(attempt);
-        }
-      }
       return;
     }
     if (!group.cumulative) {
@@ -185,10 +201,10 @@ export function useCompetitorEntry(
       });
       return;
     }
-    const next = stopAttemptAtLimit(budget, nextAttempt.roundId, nextAttempt.attemptNumber);
-    replaceBudget(competitionId, next);
-    const stopped = next.attempts.find((attempt) => sameAttempt(attempt, nextAttempt));
-    if (stopped && canSubmit) void submitAttempt(stopped);
+    replaceBudget(
+      competitionId,
+      stopAttemptAtLimit(budget, nextAttempt.roundId, nextAttempt.attemptNumber),
+    );
   };
 
   const moveAttempt = (from: number, to: number) => {
@@ -219,9 +235,11 @@ export function useCompetitorEntry(
     ordered,
     nextAttempt,
     online,
+    canSubmit,
     liveResultsFailed: liveToken !== null && liveResults.isError,
     commitAttempt,
     submitAttempt,
+    submitPending,
     runAction,
     moveAttempt,
     takeRemote,

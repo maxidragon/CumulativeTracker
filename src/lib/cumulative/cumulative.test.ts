@@ -190,6 +190,21 @@ describe("budget actions", () => {
     expect(next.attempts[1]).toMatchObject({ outcome: "dnf", centiseconds: 30_000 });
   });
 
+  it("marks the round's untaken attempts DNS after stopping at the limit", () => {
+    const current = budget({
+      limitCentiseconds: 120_000,
+      attempts: [
+        tracked("444bf-r1", 1, "ok", 90_000),
+        tracked("444bf-r1", 2, "skipped", null),
+        tracked("444bf-r1", 3, "skipped", null),
+        tracked("555bf-r1", 1, "skipped", null, 4),
+      ],
+    });
+    const next = stopAttemptAtLimit(current, "444bf-r1", 2);
+    expect(next.attempts.map(({ outcome }) => outcome)).toEqual(["ok", "dnf", "dns", "skipped"]);
+    expect(next.attempts[2]).toMatchObject({ auto: true, centiseconds: null });
+  });
+
   it("refuses stop-at-limit while an elapsed time is unknown", () => {
     const current = budget({
       attempts: [

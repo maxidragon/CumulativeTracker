@@ -1,4 +1,4 @@
-import { ArrowDownward, ArrowUpward, Close, DragIndicator } from "@mui/icons-material";
+import { ArrowDownward, ArrowUpward, DragIndicator } from "@mui/icons-material";
 import {
   Alert,
   Box,
@@ -9,10 +9,8 @@ import {
 } from "@mui/material";
 import type { Person } from "@wca/helpers";
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
 import { ConfirmActionDialog } from "../../components/ConfirmActionDialog";
 import { EventIcon } from "../../components/EventIcon";
-import { Stat } from "../../components/Stat";
 import { formatTime, type TrackedAttempt } from "../../lib/attempt";
 import { budgetBeforeAttempt } from "../../lib/cumulative";
 import type { CompetitionGroup } from "../../lib/wca";
@@ -20,7 +18,7 @@ import type { ScoretakingToken } from "../../lib/wcaLive";
 import { AttemptInput } from "../entry/AttemptInput";
 import { SyncStatus } from "./SyncStatus";
 import { useCompetitorEntry, type CompetitorAction } from "./useCompetitorEntry";
-import { attemptSyncLabel, countryFlag } from "./viewModel";
+import { attemptSyncLabel } from "./viewModel";
 
 type CompetitorPanelProps = {
   competitionId: string;
@@ -29,15 +27,16 @@ type CompetitorPanelProps = {
   liveToken: ScoretakingToken | null;
   /** Bump to put the cursor on the next empty attempt again, e.g. for the same competitor. */
   focusRequest: number;
-  closeTo: string;
-  /** Enter on the last attempt, or Escape on an unchanged one: back to the competitor search. */
-  onDone: () => void;
+  /** Escape on an unchanged attempt: back to the competitor search, scorecard kept open. */
+  onExit: () => void;
+  /** The scorecard is finished (and on WCA Live, in live mode): close it. */
+  onConfirmed: () => void;
 };
 
 function formatOfficialResult(result: number): string {
   if (result === -1) return "DNF";
   if (result === -2) return "DNS";
-  return formatTime(result, { compact: true });
+  return formatTime(result);
 }
 
 const attemptKey = (attempt: TrackedAttempt) => `${attempt.roundId}:${attempt.attemptNumber}`;
@@ -48,8 +47,8 @@ export function CompetitorPanel({
   person,
   liveToken,
   focusRequest,
-  closeTo,
-  onDone,
+  onExit,
+  onConfirmed,
 }: CompetitorPanelProps) {
   const entry = useCompetitorEntry(competitionId, group, person, liveToken);
   const { budget, summary, ordered, nextAttempt } = entry;
@@ -89,15 +88,30 @@ export function CompetitorPanel({
     refocusKey.current = null;
   }, [orderSignature]);
 
-  const limitNote = summary.isUpperBound && group.cumulative ? "≤ " : "";
+  const anyEntered = budget.attempts.some(({ outcome }) => outcome !== "skipped");
   const nextRound = group.rounds.find(({ roundId }) => roundId === nextAttempt?.roundId);
   const multiRound = group.rounds.length > 1;
+
+  const [submitting, setSubmitting] = useState(false);
+  const confirm = async () => {
+    if (!liveToken) {
+      onConfirmed();
+      return;
+    }
+    if (!entry.canSubmit || submitting) return;
+    setSubmitting(true);
+    const done = await entry.submitPending();
+    setSubmitting(false);
+    if (done) onConfirmed();
+  };
 
   const dialog: Record<CompetitorAction, { title: string; confirm: string; description: string }> = {
     stop: {
       title: "Stop this attempt at the limit?",
       confirm: "Record DNF",
-      description: `The next attempt will be recorded as DNF at exactly ${formatTime(group.cumulative ? Math.max(0, summary.remainingCentiseconds) : group.limitCentiseconds, { compact: true })}.`,
+      description: group.cumulative
+        ? `The next attempt will be recorded as DNF at exactly ${formatTime(Math.max(0, summary.remainingCentiseconds))}, and the rest of ${nextRound ? `${nextRound.eventName} ${nextRound.roundLabel}` : "this round"} as DNS.`
+        : `The next attempt will be recorded as DNF at exactly ${formatTime(group.limitCentiseconds)}.`,
     },
     dns: {
       title: "DNS the remaining attempts?",
@@ -112,56 +126,33 @@ export function CompetitorPanel({
   };
 
   return (
-    <Stack spacing={3}>
-      <Stack direction="row" spacing={1} sx={{ alignItems: "flex-start" }}>
-        <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-          <Typography component="h2" sx={{ fontWeight: 700 }} variant="h5">
-            {countryFlag(person.countryIso2)} {person.name}
+    <Stack spacing={2}>
+      {group.cumulative ? (
+        <Stack
+          aria-label="Cumulative limit used and remaining"
+          aria-live="polite"
+          direction="row"
+          role="group"
+          spacing={3}
+          sx={{ fontVariantNumeric: "tabular-nums" }}
+        >
+          <Typography>
+            <Box component="span" sx={{ color: "text.secondary", mr: 1 }}>
+              Used
+            </Box>
+            <strong>{formatTime(summary.usedCentiseconds)}</strong>
           </Typography>
-          <Typography color="text.secondary" variant="body2">
-            Registrant #{person.registrantId}
+          <Typography>
+            <Box component="span" sx={{ color: "text.secondary", mr: 1 }}>
+              Remaining
+            </Box>
+            <strong>
+              {summary.isUpperBound ? "≤ " : ""}
+              {formatTime(Math.max(0, summary.remainingCentiseconds))}
+            </strong>
           </Typography>
-        </Box>
-        <IconButton aria-label="Close competitor" component={Link} to={closeTo}>
-          <Close />
-        </IconButton>
-      </Stack>
-
-      <Box
-        aria-live="polite"
-        sx={{
-          display: "grid",
-          gap: 2,
-          gridTemplateColumns: { xs: "1fr 1fr", sm: "1.3fr 1fr" },
-        }}
-      >
-        <Stat
-          caption={
-            <>
-              {entry.remainingAttempts} attempt{entry.remainingAttempts === 1 ? "" : "s"} left
-              {entry.average !== null && entry.remainingAttempts > 1
-                ? ` · avg ${formatTime(entry.average, { compact: true })}`
-                : ""}
-            </>
-          }
-          emphasis
-          label="Next attempt cap"
-          value={`${limitNote}${formatTime(Math.max(0, summary.capForNextAttemptCentiseconds), { compact: true })}`}
-        />
-        {group.cumulative ? (
-          <Stat
-            caption={`used ${formatTime(summary.usedCentiseconds, { compact: true })} of ${formatTime(group.limitCentiseconds, { compact: true })}`}
-            label="Remaining"
-            value={`${limitNote}${formatTime(Math.max(0, summary.remainingCentiseconds), { compact: true })}`}
-          />
-        ) : (
-          <Stat
-            caption={`used ${formatTime(summary.usedCentiseconds, { compact: true })} across entered attempts`}
-            label="Limit type"
-            value="Per attempt"
-          />
-        )}
-      </Box>
+        </Stack>
+      ) : null}
 
       {summary.unknownCount > 0 ? (
         <Alert severity="warning">
@@ -185,15 +176,9 @@ export function CompetitorPanel({
       ) : null}
 
       {multiRound ? (
-        <Box>
-          <Typography component="h3" sx={{ fontWeight: 700 }} variant="subtitle1">
-            Attempts in the order they were done
-          </Typography>
-          <Typography color="text.secondary" variant="body2">
-            The shared limit is spent in this order. If the competitor did them differently,
-            drag an attempt by its handle, use the arrows, or press Alt+↑ / Alt+↓ in its field.
-          </Typography>
-        </Box>
+        <Typography color="text.secondary" variant="body2">
+          In the order they were done. Drag, use the arrows or Alt+↑ / Alt+↓ to reorder.
+        </Typography>
       ) : null}
 
       <Stack ref={attemptsRef} spacing={1.5}>
@@ -281,10 +266,10 @@ export function CompetitorPanel({
                       : `Attempt ${attempt.attemptNumber}`
                   }
                   onCommit={entry.commitAttempt}
-                  onExit={onDone}
+                  onExit={onExit}
                   onMove={(direction, via) => {
                     if (via === "enter" && direction === "next" && index === ordered.length - 1) {
-                      onDone();
+                      void confirm();
                       return;
                     }
                     attemptFields()[index + (direction === "next" ? 1 : -1)]?.focus();
@@ -302,9 +287,7 @@ export function CompetitorPanel({
                   <AttemptSync
                     attempt={attempt}
                     online={entry.online}
-                    onSubmit={(overwriteRemote) =>
-                      void entry.submitAttempt(attempt, overwriteRemote)
-                    }
+                    onKeepMine={() => void entry.submitAttempt(attempt, true)}
                     onTakeRemote={() => entry.takeRemote(attempt)}
                   />
                 ) : null}
@@ -336,20 +319,30 @@ export function CompetitorPanel({
         })}
       </Stack>
 
+      <Button
+        disabled={liveToken !== null && (!entry.canSubmit || submitting)}
+        fullWidth
+        onClick={() => void confirm()}
+        size="large"
+        variant="contained"
+      >
+        {liveToken ? (submitting ? "Submitting…" : "Submit to WCA Live") : "Done"}
+      </Button>
+
       <Stack direction="row" sx={{ flexWrap: "wrap", gap: 1 }}>
         <Button
           disabled={
             !nextAttempt || (group.cumulative && (summary.isUpperBound || summary.exhausted))
           }
           onClick={() => setPendingAction("stop")}
-          variant="contained"
+          variant="outlined"
         >
           Stopped at the limit
         </Button>
         {group.cumulative ? (
           <Button
             color="warning"
-            disabled={!nextAttempt || !summary.exhausted}
+            disabled={!nextAttempt || !anyEntered}
             onClick={() => setPendingAction("dns")}
             variant="outlined"
           >
@@ -380,12 +373,12 @@ export function CompetitorPanel({
 function AttemptSync({
   attempt,
   online,
-  onSubmit,
+  onKeepMine,
   onTakeRemote,
 }: {
   attempt: TrackedAttempt;
   online: boolean;
-  onSubmit: (overwriteRemote: boolean) => void;
+  onKeepMine: () => void;
   onTakeRemote: () => void;
 }) {
   if (attempt.estimated) {
@@ -396,24 +389,19 @@ function AttemptSync({
     );
   }
   const conflict = attempt.remoteResult;
-  const pending = attempt.syncStatus !== "sending" && attempt.syncStatus !== "synced";
   return (
     <Stack spacing={0.5} sx={{ mt: 0.5 }}>
       <Stack direction="row" sx={{ alignItems: "center", flexWrap: "wrap", gap: 1 }}>
         <SyncStatus label={attemptSyncLabel(attempt)} />
-        {pending ? (
-          <Button disabled={!online} onClick={() => onSubmit(conflict !== undefined)} size="small">
-            {conflict !== undefined
-              ? "Submit mine"
-              : attempt.syncStatus === "failed"
-                ? "Retry"
-                : "Submit"}
-          </Button>
-        ) : null}
         {conflict !== undefined ? (
-          <Button onClick={onTakeRemote} size="small">
-            Take WCA Live
-          </Button>
+          <>
+            <Button disabled={!online} onClick={onKeepMine} size="small">
+              Submit mine
+            </Button>
+            <Button onClick={onTakeRemote} size="small">
+              Take WCA Live
+            </Button>
+          </>
         ) : null}
       </Stack>
       {conflict !== undefined ? (

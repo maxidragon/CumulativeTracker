@@ -24,6 +24,10 @@ export function dnsRemainingInRound(
   );
 }
 
+/**
+ * The judge stopped this attempt at the cap (A1a4): it is a DNF at exactly the remaining time,
+ * and with the limit spent, the round's untaken attempts become DNS.
+ */
 export function stopAttemptAtLimit(
   budget: Budget,
   roundId: string,
@@ -63,5 +67,5 @@ export function stopAttemptAtLimit(
     };
   });
 
-  return { ...budget, attempts };
+  return { ...budget, attempts: dnsRemainingInRound(attempts, roundId, enteredAt) };
 }

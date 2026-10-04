@@ -47,7 +47,7 @@ describe("AttemptInput", () => {
     expect(onCommit).toHaveBeenLastCalledWith(
       expect.objectContaining({ outcome: "dnf", centiseconds: null }),
     );
-    expect(screen.getByText("elapsed time not recorded")).toBeInTheDocument();
+    expect(screen.getByText("Elapsed time not recorded")).toBeInTheDocument();
   });
 
   it.each(["s", "S", "*"])("toggles DNS with the %s key", (key) => {
@@ -137,18 +137,13 @@ describe("AttemptInput", () => {
     expect(onCommit).not.toHaveBeenCalled();
   });
 
-  it("toggles estimated with E and reorders with Alt+arrows", () => {
+  it("reorders with Alt+arrows", () => {
     const onCommit = vi.fn();
     const onReorder = vi.fn();
     render(
       <AttemptInput attempt={skippedAttempt} onCommit={onCommit} onReorder={onReorder} />,
     );
     const input = screen.getByLabelText("Attempt 2");
-    for (const key of "6000") fireEvent.keyDown(input, { key });
-    fireEvent.keyDown(input, { key: "e" });
-    expect(onCommit).toHaveBeenLastCalledWith(
-      expect.objectContaining({ centiseconds: 6_000, estimated: true }),
-    );
     fireEvent.keyDown(input, { key: "ArrowUp", altKey: true });
     expect(onReorder).toHaveBeenCalledWith("earlier");
     fireEvent.keyDown(input, { key: "ArrowDown", altKey: true });
@@ -166,10 +161,10 @@ describe("AttemptInput", () => {
     expect(onExit).toHaveBeenCalledOnce();
   });
 
-  it("keeps the tickboxes out of the tab order so Tab goes field to field", () => {
+  it("keeps the DNF and DNS toggles out of the tab order so Tab goes field to field", () => {
     render(<AttemptInput attempt={skippedAttempt} onCommit={vi.fn()} />);
-    for (const name of ["DNF", "DNS", "Estimated"]) {
-      expect(screen.getByRole("checkbox", { name })).toHaveAttribute("tabindex", "-1");
+    for (const name of ["DNF", "DNS"]) {
+      expect(screen.getByRole("button", { name })).toHaveAttribute("tabindex", "-1");
     }
   });
 
@@ -181,6 +176,6 @@ describe("AttemptInput", () => {
         onCommit={vi.fn()}
       />,
     );
-    expect(screen.getByText(/over the 2:30 cap/i)).toBeInTheDocument();
+    expect(screen.getByText(/over the 2:30.00 cap/i)).toBeInTheDocument();
   });
 });

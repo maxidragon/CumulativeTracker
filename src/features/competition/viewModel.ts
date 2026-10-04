@@ -1,20 +1,6 @@
 import { countedTime, formatTime, type TrackedAttempt } from "../../lib/attempt";
-import {
-  attemptsLeft,
-  averageForRemainingAttempts,
-  deriveBudget,
-  type Budget,
-  type BudgetSummary,
-  type RoundPlan,
-} from "../../lib/cumulative";
+import { deriveBudget, type Budget, type BudgetSummary } from "../../lib/cumulative";
 import type { CompetitionGroup } from "../../lib/wca";
-
-export type CompetitorStatus =
-  | "Not started"
-  | "On track"
-  | "Tight"
-  | "Exhausted"
-  | "Incomplete";
 
 export function summaryForGroup(
   group: CompetitionGroup,
@@ -39,29 +25,6 @@ export function summaryForGroup(
   };
 }
 
-export function competitorStatus(
-  group: CompetitionGroup,
-  budget: Budget,
-  plans: RoundPlan[],
-): CompetitorStatus {
-  const summary = summaryForGroup(group, budget);
-  if (summary.unknownCount > 0) return "Incomplete";
-  if (group.cumulative && summary.exhausted) return "Exhausted";
-  if (budget.attempts.every(({ outcome }) => outcome === "skipped")) return "Not started";
-
-  const left = attemptsLeft(plans, budget.attempts);
-  const average = averageForRemainingAttempts(summary, left);
-  if (
-    group.cumulative &&
-    average !== null &&
-    budget.perAttemptLimitCentiseconds !== null &&
-    average < budget.perAttemptLimitCentiseconds
-  ) {
-    return "Tight";
-  }
-  return "On track";
-}
-
 /** A results-table cell: what WCA Live would show, plus the elapsed time behind a DNF. */
 export function formatAttemptResult(attempt: TrackedAttempt): string {
   if (attempt.outcome === "skipped") return "";
@@ -69,9 +32,9 @@ export function formatAttemptResult(attempt: TrackedAttempt): string {
   if (attempt.outcome === "dnf") {
     return attempt.centiseconds === null
       ? "DNF (?)"
-      : `DNF (${formatTime(attempt.centiseconds, { compact: true })})`;
+      : `DNF (${formatTime(attempt.centiseconds)})`;
   }
-  return formatTime(attempt.centiseconds ?? 0, { compact: true });
+  return formatTime(attempt.centiseconds ?? 0);
 }
 
 export function countryFlag(countryIso2: string): string {

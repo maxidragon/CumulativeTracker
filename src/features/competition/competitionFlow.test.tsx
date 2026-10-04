@@ -119,17 +119,14 @@ describe("local competition flow", () => {
     const competitorLink = competitorLinks[0];
     if (!competitorLink) throw new Error("Competitor link was not rendered.");
     await user.click(competitorLink);
-    expect(
-      screen.getByRole("heading", { name: /Example Competitor/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Competitor")).toHaveValue("Example Competitor");
 
     const attempt = screen.getByLabelText("Attempt 1");
     await user.click(attempt);
     await user.keyboard("100000{Enter}");
 
-    const capCard = screen.getByText("Next attempt cap").parentElement;
-    if (!capCard) throw new Error("Cap card was not rendered.");
-    await waitFor(() => expect(within(capCard).getByText("10:00")).toBeInTheDocument());
+    const budget = screen.getByRole("group", { name: "Cumulative limit used and remaining" });
+    await waitFor(() => expect(budget).toHaveTextContent("Remaining10:00.00"));
     expect(localStorage.getItem("ct:v1:budgets:InventedOpen2026")).toContain(
       '"centiseconds":60000',
     );
@@ -138,7 +135,7 @@ describe("local competition flow", () => {
   it("opens a scorecard by registrant id and returns to the search after the last attempt", async () => {
     const user = userEvent.setup();
     renderFlow();
-    const search = screen.getByLabelText("Find competitor (registrant id or name)");
+    const search = screen.getByLabelText("Competitor");
     await user.click(search);
     await user.keyboard("7{Enter}");
 
@@ -153,12 +150,13 @@ describe("local competition flow", () => {
   it("picks a search match with the arrow keys and returns to the search with Escape", async () => {
     const user = userEvent.setup();
     renderFlow();
-    const search = screen.getByLabelText("Find competitor (registrant id or name)");
+    const search = screen.getByLabelText("Competitor");
     await user.click(search);
     await user.keyboard("example{ArrowDown}");
-    expect(
-      screen.getByRole("row", { current: true, name: /Example Competitor/ }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /Example Competitor/ })).toHaveClass(
+      "Mui-focused",
+    );
+    expect(screen.queryByRole("row", { current: true })).not.toBeInTheDocument();
     await user.keyboard("{Enter}");
 
     const first = await screen.findByLabelText("Attempt 1");
@@ -169,6 +167,67 @@ describe("local competition flow", () => {
     expect(search).toHaveFocus();
   });
 
+  it("suggests an exact registrant id or names containing the text, without hiding rows", async () => {
+    const [person] = wcif.persons;
+    if (!person) throw new Error("Fixture competitor missing.");
+    const user = userEvent.setup();
+    renderFlow("/c/InventedOpen2026/g/333bf-r1", {
+      ...wcif,
+      persons: [
+        person,
+        { ...person, registrantId: 17, name: "Zoë Sample", wcaUserId: 170 },
+      ],
+    });
+    const search = screen.getByLabelText("Competitor");
+
+    await user.type(search, "7");
+    expect(screen.getAllByRole("option").map((option) => option.textContent)).toEqual([
+      expect.stringContaining("#7"),
+    ]);
+    expect(screen.getAllByRole("link", { name: /Zoë Sample/ }).length).toBeGreaterThan(0);
+
+    await user.clear(search);
+    await user.type(search, "zoe");
+    expect(screen.getAllByRole("option").map((option) => option.textContent)).toEqual([
+      expect.stringContaining("Zoë Sample"),
+    ]);
+    expect(screen.getAllByRole("link", { name: /Example Competitor/ }).length).toBeGreaterThan(0);
+  });
+
+  it("clears the competitor search with Escape", async () => {
+    const user = userEvent.setup();
+    renderFlow();
+    const search = screen.getByLabelText("Competitor");
+    await user.type(search, "example");
+    await user.keyboard("{Escape}");
+    expect(search).toHaveValue("");
+    expect(screen.queryByRole("option")).not.toBeInTheDocument();
+  });
+
+  it("shows the open competitor in the search and closes it from there", async () => {
+    const user = userEvent.setup();
+    renderFlow("/c/InventedOpen2026/g/333bf-r1/7");
+    const search = screen.getByLabelText("Competitor");
+    expect(search).toHaveValue("Example Competitor");
+
+    await user.click(screen.getByRole("button", { name: "Close competitor" }));
+    expect(search).toHaveValue("");
+    expect(screen.queryByLabelText("Attempt 1")).not.toBeInTheDocument();
+  });
+
+  it("closes the scorecard with Done in local mode", async () => {
+    const user = userEvent.setup();
+    renderFlow("/c/InventedOpen2026/g/333bf-r1/7");
+    await user.click(await screen.findByLabelText("Attempt 1"));
+    await user.keyboard("40000{Enter}");
+    await user.click(screen.getByRole("button", { name: "Done" }));
+
+    const search = screen.getByLabelText("Competitor");
+    expect(search).toHaveValue("");
+    expect(search).toHaveFocus();
+    expect(screen.queryByLabelText("Attempt 1")).not.toBeInTheDocument();
+  });
+
   it("lists the shortcuts when ? is pressed outside a field", async () => {
     const user = userEvent.setup();
     renderFlow();
@@ -177,7 +236,7 @@ describe("local competition flow", () => {
     screen.getByRole("button", { name: /Shortcuts/ }).focus();
     await user.keyboard("?");
     const dialog = screen.getByRole("dialog", { name: "Keyboard shortcuts" });
-    expect(dialog).toHaveTextContent("Toggle estimated");
+    expect(dialog).toHaveTextContent("DNS");
     await user.click(within(dialog).getByRole("button", { name: "Close" }));
     await waitFor(() => expect(dialog).not.toBeInTheDocument());
   });
@@ -217,7 +276,7 @@ describe("local competition flow", () => {
     expect(moved).toHaveFocus();
   });
 
-  it("submits a committed attempt immediately in WCA Live mode", async () => {
+  it("submits entered attempts to WCA Live on confirm and closes the scorecard", async () => {
     useAuthStore.setState({
       session: {
         accessToken: "wca-session",
@@ -242,6 +301,10 @@ describe("local competition flow", () => {
     const input = await screen.findByLabelText("Attempt 1");
     await user.click(input);
     await user.keyboard("100000{Enter}");
+    expect(
+      fetchMock.mock.calls.some(([url]) => requestUrl(url).endsWith("/api/enter-attempt")),
+    ).toBe(false);
+    await user.click(screen.getByRole("button", { name: "Submit to WCA Live" }));
 
     await waitFor(() => {
       expect(
@@ -262,10 +325,8 @@ describe("local competition flow", () => {
       attemptNumber: 1,
       attemptResult: 60_000,
     });
-    const attemptRow = input.closest<HTMLElement>("[data-attempt-key]");
-    if (!attemptRow) throw new Error("Attempt row was not rendered.");
-    await waitFor(() =>
-      expect(within(attemptRow).getByText("On WCA Live")).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByLabelText("Competitor")).toHaveValue(""));
+    expect(screen.getByLabelText("Competitor")).toHaveFocus();
+    expect(screen.getAllByLabelText("On WCA Live").length).toBeGreaterThan(0);
   });
 });
