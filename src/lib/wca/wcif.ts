@@ -27,8 +27,31 @@ const EVENT_NAMES: Record<EventId, string> = {
   "333ft": "3x3x3 With Feet",
 };
 
+/** Names for where the full event name does not fit, such as a field label. */
+const EVENT_SHORT_NAMES: Partial<Record<string, string>> = {
+  "222": "2x2",
+  "333": "3x3",
+  "444": "4x4",
+  "555": "5x5",
+  "666": "6x6",
+  "777": "7x7",
+  "333bf": "3x3 BLD",
+  "333fm": "3x3 FM",
+  "333oh": "3x3 OH",
+  clock: "Clock",
+  minx: "Megaminx",
+  pyram: "Pyraminx",
+  skewb: "Skewb",
+  sq1: "SQ1",
+  "444bf": "4x4 BLD",
+  "555bf": "5x5 BLD",
+  "333mbf": "3x3 MBLD",
+  fto: "FTO",
+};
+
 export type CompetitionRound = RoundPlan & {
   eventName: string;
+  eventShortName: string;
   roundNumber: number;
   /** "First round", "Second round", …, "Final", as WCA Live names rounds. */
   roundLabel: string;
@@ -61,6 +84,7 @@ function toCompetitionRound(
     roundId: round.id,
     eventId,
     eventName: EVENT_NAMES[eventId],
+    eventShortName: EVENT_SHORT_NAMES[eventId] ?? EVENT_NAMES[eventId],
     roundNumber: number,
     roundLabel: roundLabel(number, roundCount),
     format: round.format,

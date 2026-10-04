@@ -91,9 +91,21 @@ export function CompetitorPanel({
   const anyEntered = budget.attempts.some(({ outcome }) => outcome !== "skipped");
   const nextRound = group.rounds.find(({ roundId }) => roundId === nextAttempt?.roundId);
   const multiRound = group.rounds.length > 1;
+  const nextLabel = nextAttempt
+    ? multiRound
+      ? `${nextRound?.eventName ?? nextAttempt.roundId} attempt ${nextAttempt.attemptNumber}`
+      : `Attempt ${nextAttempt.attemptNumber}`
+    : "The next attempt";
+  const untakenAfterStop = Math.max(
+    0,
+    budget.attempts.filter(({ outcome }) => outcome === "skipped").length - 1,
+  );
 
   const [submitting, setSubmitting] = useState(false);
   const confirm = async () => {
+    // Commit a field still being typed in first: its blur handler saves it synchronously.
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && attemptsRef.current?.contains(active)) active.blur();
     if (!liveToken) {
       onConfirmed();
       return;
@@ -110,8 +122,12 @@ export function CompetitorPanel({
       title: "Stop this attempt at the limit?",
       confirm: "Record DNF",
       description: group.cumulative
-        ? `The next attempt will be recorded as DNF at exactly ${formatTime(Math.max(0, summary.remainingCentiseconds))}, and the rest of ${nextRound ? `${nextRound.eventName} ${nextRound.roundLabel}` : "this round"} as DNS.`
-        : `The next attempt will be recorded as DNF at exactly ${formatTime(group.limitCentiseconds)}.`,
+        ? `${nextLabel} will be recorded as DNF at exactly ${formatTime(Math.max(0, summary.remainingCentiseconds))}${
+            untakenAfterStop > 0
+              ? `, and the ${untakenAfterStop} other untaken attempt${untakenAfterStop === 1 ? "" : "s"}${multiRound ? " in this group" : ""} as DNS`
+              : ""
+          }.`
+        : `${nextLabel} will be recorded as DNF at exactly ${formatTime(group.limitCentiseconds)}.`,
     },
     dns: {
       title: "DNS the remaining attempts?",
@@ -121,7 +137,9 @@ export function CompetitorPanel({
     clear: {
       title: "Clear this competitor?",
       confirm: "Clear attempts",
-      description: `Every locally tracked attempt for ${person.name} in this group will be cleared.`,
+      description: `Every attempt for ${person.name} in this group will be cleared.${
+        liveToken ? " Submitting the scorecard then clears them on WCA Live too." : ""
+      }`,
     },
   };
 
@@ -181,7 +199,7 @@ export function CompetitorPanel({
         </Typography>
       ) : null}
 
-      <Stack ref={attemptsRef} spacing={1.5}>
+      <Stack ref={attemptsRef} spacing={multiRound ? 1 : 1.5}>
         {ordered.map((attempt, index) => {
           const round = group.rounds.find(({ roundId }) => roundId === attempt.roundId);
           const eventName = round?.eventName ?? round?.eventId ?? "Event";
@@ -208,32 +226,26 @@ export function CompetitorPanel({
               spacing={1}
               sx={{
                 alignItems: "flex-start",
-                borderRadius: 1,
                 opacity: dragFrom === index ? 0.4 : 1,
-                outline: dropping ? 2 : 0,
-                outlineColor: "primary.main",
-                outlineOffset: 4,
+                // In a shared group each attempt is a card that can be picked up by its handle.
+                ...(multiRound
+                  ? {
+                      bgcolor: "background.paper",
+                      border: 1,
+                      borderColor: dropping ? "primary.main" : "divider",
+                      borderRadius: 2,
+                      boxShadow: dropping ? 3 : 0,
+                      overflow: "hidden",
+                      pl: { xs: 1, md: 0 },
+                      pr: 0.5,
+                      py: 1,
+                      transition: "border-color 120ms, box-shadow 120ms",
+                    }
+                  : {}),
               }}
             >
               {multiRound ? (
-                <Stack sx={{ alignItems: "center", pt: 0.5 }}>
-                  <Box
-                    title={`Done ${index + 1} of ${ordered.length}`}
-                    sx={{
-                      bgcolor: "primary.main",
-                      borderRadius: "50%",
-                      color: "primary.contrastText",
-                      display: "grid",
-                      fontSize: 14,
-                      fontWeight: 700,
-                      height: 28,
-                      placeItems: "center",
-                      width: 28,
-                    }}
-                  >
-                    {index + 1}
-                  </Box>
-                  {round ? <EventIcon eventId={round.eventId} eventName={eventName} /> : null}
+                <>
                   <Box
                     aria-hidden="true"
                     draggable
@@ -243,17 +255,50 @@ export function CompetitorPanel({
                     }}
                     onDragStart={(event) => {
                       event.dataTransfer.effectAllowed = "move";
+                      const card = event.currentTarget.closest("[data-attempt-key]");
+                      if (card) event.dataTransfer.setDragImage(card, 24, 24);
                       setDragFrom(index);
                     }}
-                    sx={{ color: "text.secondary", cursor: "grab", display: "flex", py: 0.5 }}
+                    sx={{
+                      alignItems: "center",
+                      alignSelf: "stretch",
+                      color: "text.secondary",
+                      cursor: "grab",
+                      // Touch screens do not fire drag events; the arrows reorder there.
+                      display: { xs: "none", md: "flex" },
+                      my: -1,
+                      px: 0.5,
+                      "&:hover": { bgcolor: "action.hover", color: "text.primary" },
+                      "&:active": { cursor: "grabbing" },
+                    }}
                     title="Drag to reorder"
                   >
-                    <DragIndicator />
+                    <DragIndicator sx={{ fontSize: 32 }} />
                   </Box>
-                </Stack>
+                  <Stack spacing={0.5} sx={{ alignItems: "center", pt: 1.25 }}>
+                    <Box
+                      title={`Done ${index + 1} of ${ordered.length}`}
+                      sx={{
+                        bgcolor: "primary.main",
+                        borderRadius: "50%",
+                        color: "primary.contrastText",
+                        display: "grid",
+                        fontSize: 14,
+                        fontWeight: 700,
+                        height: 28,
+                        placeItems: "center",
+                        width: 28,
+                      }}
+                    >
+                      {index + 1}
+                    </Box>
+                    {round ? <EventIcon eventId={round.eventId} eventName={eventName} /> : null}
+                  </Stack>
+                </>
               ) : null}
               <Box sx={{ flexGrow: 1, minWidth: 0 }}>
                 <AttemptInput
+                  stackToggles={multiRound}
                   attempt={attempt}
                   capCentiseconds={
                     group.cumulative
@@ -262,7 +307,7 @@ export function CompetitorPanel({
                   }
                   label={
                     multiRound
-                      ? `${round?.eventId ?? attempt.roundId} · attempt ${attempt.attemptNumber}`
+                      ? `${round?.eventShortName ?? attempt.roundId} · attempt ${attempt.attemptNumber}`
                       : `Attempt ${attempt.attemptNumber}`
                   }
                   onCommit={entry.commitAttempt}
@@ -286,14 +331,12 @@ export function CompetitorPanel({
                 {liveToken && attempt.outcome !== "skipped" ? (
                   <AttemptSync
                     attempt={attempt}
-                    online={entry.online}
-                    onKeepMine={() => void entry.submitAttempt(attempt, true)}
                     onTakeRemote={() => entry.takeRemote(attempt)}
                   />
                 ) : null}
               </Box>
               {multiRound ? (
-                <Stack direction="row">
+                <Stack>
                   <IconButton
                     aria-label={`Move ${eventName} attempt ${attempt.attemptNumber} earlier`}
                     disabled={index === 0}
@@ -323,6 +366,9 @@ export function CompetitorPanel({
         disabled={liveToken !== null && (!entry.canSubmit || submitting)}
         fullWidth
         onClick={() => void confirm()}
+        // Keep focus in the field on press: blurring it there would commit the attempt, clear
+        // its warnings and shift the button away before the click lands.
+        onMouseDown={(event) => event.preventDefault()}
         size="large"
         variant="contained"
       >
@@ -372,13 +418,9 @@ export function CompetitorPanel({
 
 function AttemptSync({
   attempt,
-  online,
-  onKeepMine,
   onTakeRemote,
 }: {
   attempt: TrackedAttempt;
-  online: boolean;
-  onKeepMine: () => void;
   onTakeRemote: () => void;
 }) {
   if (attempt.estimated) {
@@ -394,20 +436,15 @@ function AttemptSync({
       <Stack direction="row" sx={{ alignItems: "center", flexWrap: "wrap", gap: 1 }}>
         <SyncStatus label={attemptSyncLabel(attempt)} />
         {conflict !== undefined ? (
-          <>
-            <Button disabled={!online} onClick={onKeepMine} size="small">
-              Submit mine
-            </Button>
-            <Button onClick={onTakeRemote} size="small">
-              Take WCA Live
-            </Button>
-          </>
+          <Button onClick={onTakeRemote} size="small">
+            Use WCA Live's
+          </Button>
         ) : null}
       </Stack>
       {conflict !== undefined ? (
         <Typography color="warning.main" variant="body2">
-          WCA Live has {formatOfficialResult(conflict)} for this attempt. Choose which value to
-          keep.
+          WCA Live has {formatOfficialResult(conflict)}. Submitting replaces it with this
+          value.
         </Typography>
       ) : null}
       {attempt.syncError ? (

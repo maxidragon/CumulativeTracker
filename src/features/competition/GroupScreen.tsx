@@ -11,6 +11,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import { useQueryClient } from "@tanstack/react-query";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
@@ -18,10 +19,10 @@ import {
   createCompetitionBudget,
   extractCompetitionGroups,
 } from "../../lib/wca";
-import { reconcileLiveBudget } from "../../lib/wcaLive";
+import { reconcileLiveBudget, type LiveResults } from "../../lib/wcaLive";
 import { EventIcon } from "../../components/EventIcon";
 import { useAuthStore } from "../auth/store";
-import { useLiveResults } from "../live/hooks";
+import { liveResultsKey, useLiveResults } from "../live/hooks";
 import { activeLiveToken } from "../live/mode";
 import { CompetitionState } from "./CompetitionState";
 import { CompetitorPanel } from "./CompetitorPanel";
@@ -71,6 +72,7 @@ export function GroupScreen() {
   const session = useAuthStore((state) => state.session);
   const liveToken = activeLiveToken(competitionId, tracking, session);
   const liveResults = useLiveResults(competitionId, liveToken !== null);
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   /** True while the field holds typed text; otherwise it shows the open competitor. */
   const [editing, setEditing] = useState(false);
@@ -99,16 +101,20 @@ export function GroupScreen() {
     if (defaultBudgets.length > 0) ensureBudgets(competitionId, defaultBudgets);
   }, [competitionId, defaultBudgets, ensureBudgets]);
   useEffect(() => {
-    if (!group || !liveResults.data || !tracking) return;
+    // Read the cache, not this render's copy: a submission patches it synchronously just
+    // before marking the attempt synced, and this effect may run in between.
+    const results =
+      queryClient.getQueryData<LiveResults>(liveResultsKey(competitionId)) ?? liveResults.data;
+    if (!group || !results || !tracking) return;
     for (const person of people) {
       const current = tracking.budgets[trackingBudgetKey(group.key, person.registrantId)];
       if (!current) continue;
-      const reconciled = reconcileLiveBudget(current, group, liveResults.data);
+      const reconciled = reconcileLiveBudget(current, group, results);
       if (JSON.stringify(reconciled) !== JSON.stringify(current)) {
         replaceBudget(competitionId, reconciled);
       }
     }
-  }, [competitionId, group, liveResults.data, people, replaceBudget, tracking]);
+  }, [competitionId, group, liveResults.data, people, queryClient, replaceBudget, tracking]);
   useEffect(() => {
     const handleShortcut = (event: globalThis.KeyboardEvent) => {
       const target = event.target instanceof HTMLElement ? event.target : null;
@@ -255,10 +261,16 @@ export function GroupScreen() {
               display: "grid",
               gap: 3,
               alignItems: "start",
-              gridTemplateColumns: {
-                xs: "minmax(0, 1fr)",
-                md: "380px minmax(0, 1fr)",
-              },
+              // Shared-limit attempts carry a drag handle, badge and arrows around the field, so
+              // the scorecard needs more room when the group spans several events.
+              gridTemplateColumns:
+                group.rounds.length > 1
+                  ? {
+                      xs: "minmax(0, 1fr)",
+                      md: "440px minmax(0, 1fr)",
+                      lg: "560px minmax(0, 1fr)",
+                    }
+                  : { xs: "minmax(0, 1fr)", md: "380px minmax(0, 1fr)" },
             }}
           >
             <Box>
@@ -292,6 +304,9 @@ export function GroupScreen() {
                   renderInput={(params) => (
                     <TextField
                       {...params}
+                      // Opening a round lands in the search; a competitor route focuses their
+                      // first empty attempt instead.
+                      autoFocus={selectedRegistrantId === null}
                       inputRef={searchRef}
                       label="Competitor"
                       placeholder="Registrant id or name"

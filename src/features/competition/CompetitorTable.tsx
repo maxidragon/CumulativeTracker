@@ -1,6 +1,7 @@
 import { CheckCircle, ErrorOutlined } from "@mui/icons-material";
 import {
   Box,
+  CardActionArea,
   Link as MuiLink,
   Stack,
   Table,
@@ -115,7 +116,7 @@ export function CompetitorTable({
                         sx={{ alignItems: "center", justifyContent: "center" }}
                       >
                         <EventIcon eventId={round.eventId} eventName={round.eventName} />
-                        <span aria-hidden="true">{round.eventId}</span>
+                        <span aria-hidden="true">{round.eventShortName}</span>
                       </Stack>
                     </TableCell>
                   ))
@@ -219,27 +220,31 @@ export function CompetitorTable({
         {rows.map((row) => {
           const { person, budget } = row;
           return (
-            <Box
-              component="li"
-              key={person.registrantId}
-              sx={{ border: 1, borderColor: "divider", borderRadius: 2, p: 1.5 }}
-            >
-              <Stack direction="row" spacing={1} sx={{ justifyContent: "space-between" }}>
-                <Box sx={{ minWidth: 0 }}>
-                  <MuiLink
-                    component={Link}
-                    sx={{ fontWeight: 700 }}
-                    to={linkTo(person.registrantId)}
-                    underline="hover"
-                  >
-                    {countryFlag(person.countryIso2)} {person.name}
-                  </MuiLink>
-                  <Typography color="text.secondary" variant="body2">
-                    #{person.registrantId} · used {used(row)} · remaining {remaining(row)}
-                  </Typography>
-                </Box>
-                {liveMode ? <LiveState budget={budget} /> : null}
-              </Stack>
+            <Box component="li" key={person.registrantId}>
+              {/* The whole card opens the competitor: an easy target for a thumb. */}
+              <CardActionArea
+                component={Link}
+                sx={{
+                  border: 1,
+                  borderColor:
+                    person.registrantId === selectedRegistrantId ? "primary.main" : "divider",
+                  borderRadius: 2,
+                  p: 1.5,
+                }}
+                to={linkTo(person.registrantId)}
+              >
+                <Stack direction="row" spacing={1} sx={{ justifyContent: "space-between" }}>
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography color="primary" sx={{ fontWeight: 700 }}>
+                      {countryFlag(person.countryIso2)} {person.name}
+                    </Typography>
+                    <Typography color="text.secondary" variant="body2">
+                      #{person.registrantId} · used {used(row)} · remaining {remaining(row)}
+                    </Typography>
+                  </Box>
+                  {liveMode ? <LiveState budget={budget} /> : null}
+                </Stack>
+              </CardActionArea>
             </Box>
           );
         })}

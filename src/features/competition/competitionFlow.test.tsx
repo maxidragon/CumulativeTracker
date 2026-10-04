@@ -112,6 +112,11 @@ describe("local competition flow", () => {
     vi.unstubAllGlobals();
   });
 
+  it("focuses the competitor search when the round opens", () => {
+    renderFlow();
+    expect(screen.getByLabelText("Competitor")).toHaveFocus();
+  });
+
   it("opens a competitor from the board and updates the shared budget", async () => {
     const user = userEvent.setup();
     renderFlow();
@@ -228,6 +233,19 @@ describe("local competition flow", () => {
     expect(screen.queryByLabelText("Attempt 1")).not.toBeInTheDocument();
   });
 
+  it("saves an attempt still being typed when the scorecard is confirmed", async () => {
+    const user = userEvent.setup();
+    renderFlow("/c/InventedOpen2026/g/333bf-r1/7");
+    await user.click(await screen.findByLabelText("Attempt 1"));
+    await user.keyboard("40000");
+    await user.click(screen.getByRole("button", { name: "Done" }));
+
+    expect(screen.getByLabelText("Competitor")).toHaveValue("");
+    expect(localStorage.getItem("ct:v1:budgets:InventedOpen2026")).toContain(
+      '"centiseconds":24000',
+    );
+  });
+
   it("lists the shortcuts when ? is pressed outside a field", async () => {
     const user = userEvent.setup();
     renderFlow();
@@ -253,6 +271,23 @@ describe("local competition flow", () => {
     ).toBeInTheDocument();
   });
 
+  it("clears every attempt of a competitor across the events of a shared limit", async () => {
+    const user = userEvent.setup();
+    renderFlow("/c/InventedOpen2026/g/444bf-r1+555bf-r1/7", sharedWcif);
+    await user.click(await screen.findByLabelText("4x4 BLD · attempt 1"));
+    await user.keyboard("40000{Enter}");
+    await user.click(screen.getByLabelText("5x5 BLD · attempt 1"));
+    await user.keyboard("50000{Enter}");
+
+    await user.click(screen.getByRole("button", { name: "Clear competitor" }));
+    await user.click(
+      within(screen.getByRole("dialog")).getByRole("button", { name: "Clear attempts" }),
+    );
+
+    await waitFor(() => expect(screen.getByLabelText("4x4 BLD · attempt 1")).toHaveValue(""));
+    expect(screen.getByLabelText("5x5 BLD · attempt 1")).toHaveValue("");
+  });
+
   it("reorders attempts across the events of a shared limit", async () => {
     const user = userEvent.setup();
     renderFlow("/c/InventedOpen2026/g/444bf-r1+555bf-r1/7", sharedWcif);
@@ -260,7 +295,7 @@ describe("local competition flow", () => {
       Array.from(document.querySelectorAll("[data-attempt-key]"), (row) =>
         row.getAttribute("data-attempt-key"),
       );
-    await screen.findByLabelText("555bf · attempt 1");
+    await screen.findByLabelText("5x5 BLD · attempt 1");
     expect(sequence().slice(2, 4)).toEqual(["444bf-r1:3", "555bf-r1:1"]);
 
     await user.click(
@@ -269,7 +304,7 @@ describe("local competition flow", () => {
 
     expect(sequence().slice(2, 4)).toEqual(["555bf-r1:1", "444bf-r1:3"]);
 
-    const moved = screen.getByLabelText("555bf · attempt 1");
+    const moved = screen.getByLabelText("5x5 BLD · attempt 1");
     await user.click(moved);
     await user.keyboard("{Alt>}{ArrowDown}{/Alt}");
     expect(sequence().slice(2, 4)).toEqual(["444bf-r1:3", "555bf-r1:1"]);
@@ -328,5 +363,194 @@ describe("local competition flow", () => {
     await waitFor(() => expect(screen.getByLabelText("Competitor")).toHaveValue(""));
     expect(screen.getByLabelText("Competitor")).toHaveFocus();
     expect(screen.getAllByLabelText("On WCA Live").length).toBeGreaterThan(0);
+  });
+
+  it("resubmits an attempt changed after WCA Live had it, on confirm", async () => {
+    useAuthStore.setState({
+      session: { accessToken: "wca-session", expiresAt: "2099-01-01T00:00:00.000Z" },
+      error: null,
+    });
+    saveScoretakingToken(wcif.id, "scoretaking-token");
+    useTrackingStore.getState().setLiveEnabled(wcif.id, true);
+    const liveResults = {
+      events: [
+        {
+          eventId: "333bf",
+          rounds: [{ number: 1, results: [{ personId: 7, attempts: [30_000, 0, 0] }] }],
+        },
+      ],
+    };
+    const fetchMock = vi.fn<typeof fetch>().mockImplementation((input) =>
+      Promise.resolve(
+        requestUrl(input).endsWith("/api/enter-attempt")
+          ? new Response(null, { status: 200 })
+          : new Response(JSON.stringify(liveResults), { status: 200 }),
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderFlow("/c/InventedOpen2026/g/333bf-r1/7");
+    const user = userEvent.setup();
+    const input = await screen.findByLabelText("Attempt 1");
+    await waitFor(() => expect(input).toHaveValue("5:00.00"));
+    await user.click(input);
+    await user.keyboard("{Control>}a{/Control}100000{Enter}");
+    await user.click(screen.getByRole("button", { name: "Submit to WCA Live" }));
+
+    await waitFor(() => expect(screen.getByLabelText("Competitor")).toHaveValue(""));
+    const posts = fetchMock.mock.calls.filter(([url]) =>
+      requestUrl(url).endsWith("/api/enter-attempt"),
+    ) as unknown as [string, RequestInit][];
+    expect(posts.map(([, init]) => JSON.parse(init.body as string) as unknown)).toEqual([
+      expect.objectContaining({ attemptNumber: 1, attemptResult: 60_000 }),
+    ]);
+  });
+
+  it("shows a DNF's newly entered elapsed time in the table after confirming", async () => {
+    useAuthStore.setState({
+      session: { accessToken: "wca-session", expiresAt: "2099-01-01T00:00:00.000Z" },
+      error: null,
+    });
+    saveScoretakingToken(wcif.id, "scoretaking-token");
+    useTrackingStore.getState().setLiveEnabled(wcif.id, true);
+    const liveResults = {
+      events: [
+        {
+          eventId: "333bf",
+          rounds: [{ number: 1, results: [{ personId: 7, attempts: [-1, 0, 0] }] }],
+        },
+      ],
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>().mockImplementation((input) =>
+        Promise.resolve(
+          requestUrl(input).endsWith("/api/enter-attempt")
+            ? new Response(null, { status: 200 })
+            : new Response(JSON.stringify(liveResults), { status: 200 }),
+        ),
+      ),
+    );
+
+    renderFlow("/c/InventedOpen2026/g/333bf-r1/7");
+    const user = userEvent.setup();
+    expect(await screen.findByText("Elapsed time not recorded")).toBeInTheDocument();
+    await user.click(screen.getByLabelText("Attempt 1"));
+    await user.keyboard("40000");
+    await user.click(screen.getByRole("button", { name: "Submit to WCA Live" }));
+
+    await waitFor(() => expect(screen.getByLabelText("Competitor")).toHaveValue(""));
+    const row = screen.getAllByRole("row").find((candidate) =>
+      within(candidate).queryByText(/Example Competitor/),
+    );
+    if (!row) throw new Error("Competitor row missing.");
+    expect(row).toHaveTextContent("DNF (4:00.00)");
+  });
+
+  it("keeps a DNF submitted over a solved attempt instead of reverting to the old time", async () => {
+    useAuthStore.setState({
+      session: { accessToken: "wca-session", expiresAt: "2099-01-01T00:00:00.000Z" },
+      error: null,
+    });
+    saveScoretakingToken(wcif.id, "scoretaking-token");
+    useTrackingStore.getState().setLiveEnabled(wcif.id, true);
+    let firstAttempt = 6_000;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>().mockImplementation((input, init) => {
+        if (requestUrl(input).endsWith("/api/enter-attempt")) {
+          firstAttempt = (JSON.parse(init?.body as string) as { attemptResult: number })
+            .attemptResult;
+          return Promise.resolve(new Response(null, { status: 200 }));
+        }
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              events: [
+                {
+                  eventId: "333bf",
+                  rounds: [
+                    { number: 1, results: [{ personId: 7, attempts: [firstAttempt, 0, 0] }] },
+                  ],
+                },
+              ],
+            }),
+            { status: 200 },
+          ),
+        );
+      }),
+    );
+
+    renderFlow("/c/InventedOpen2026/g/333bf-r1/7");
+    const user = userEvent.setup();
+    const input = await screen.findByLabelText("Attempt 1");
+    await waitFor(() => expect(input).toHaveValue("1:00.00"));
+    await user.click(input);
+    await user.keyboard("d");
+    await user.click(screen.getByRole("button", { name: "Submit to WCA Live" }));
+
+    await waitFor(() => expect(screen.getByLabelText("Competitor")).toHaveValue(""));
+    expect(firstAttempt).toBe(-1);
+    const row = screen.getAllByRole("row").find((candidate) =>
+      within(candidate).queryByText(/Example Competitor/),
+    );
+    if (!row) throw new Error("Competitor row missing.");
+    expect(row).toHaveTextContent("DNF (1:00.00)");
+  });
+
+  it("clears a competitor on WCA Live too, across a shared limit, on confirm", async () => {
+    useAuthStore.setState({
+      session: { accessToken: "wca-session", expiresAt: "2099-01-01T00:00:00.000Z" },
+      error: null,
+    });
+    saveScoretakingToken(wcif.id, "scoretaking-token");
+    useTrackingStore.getState().setLiveEnabled(wcif.id, true);
+    const remote: Record<string, number> = { "444bf": 6_000, "555bf": 7_000 };
+    const posts: { eventId: string; attemptNumber: number; attemptResult: number }[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>().mockImplementation((input, init) => {
+        if (requestUrl(input).endsWith("/api/enter-attempt")) {
+          const body = JSON.parse(init?.body as string) as (typeof posts)[number];
+          posts.push(body);
+          remote[body.eventId] = body.attemptResult;
+          return Promise.resolve(new Response(null, { status: 200 }));
+        }
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              events: Object.entries(remote).map(([eventId, first]) => ({
+                eventId,
+                rounds: [{ number: 1, results: [{ personId: 7, attempts: [first, 0, 0] }] }],
+              })),
+            }),
+            { status: 200 },
+          ),
+        );
+      }),
+    );
+
+    renderFlow("/c/InventedOpen2026/g/444bf-r1+555bf-r1/7", sharedWcif);
+    const user = userEvent.setup();
+    const fourBld = await screen.findByLabelText("4x4 BLD · attempt 1");
+    await waitFor(() => expect(fourBld).toHaveValue("1:00.00"));
+
+    await user.click(screen.getByRole("button", { name: "Clear competitor" }));
+    await user.click(
+      within(screen.getByRole("dialog")).getByRole("button", { name: "Clear attempts" }),
+    );
+    await waitFor(() => expect(screen.getByLabelText("4x4 BLD · attempt 1")).toHaveValue(""));
+    expect(screen.getByLabelText("5x5 BLD · attempt 1")).toHaveValue("");
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+
+    await user.click(screen.getByRole("button", { name: "Submit to WCA Live" }));
+    await waitFor(() => expect(screen.getByLabelText("Competitor")).toHaveValue(""));
+    expect(posts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ eventId: "444bf", attemptNumber: 1, attemptResult: 0 }),
+        expect.objectContaining({ eventId: "555bf", attemptNumber: 1, attemptResult: 0 }),
+      ]),
+    );
+    expect(posts).toHaveLength(2);
   });
 });
