@@ -17,7 +17,13 @@ concurrency:
 
 jobs:
   deploy:
-    if: github.event.workflow_run.conclusion == 'success'
+    # workflow_run runs with this repository's secrets and Pages permissions even when CI ran
+    # for a fork's pull request, and its branch filter only checks the branch name. Deploy
+    # only what CI checked for a push to this repository.
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
