@@ -1,12 +1,7 @@
 import { create } from "zustand";
 import type { TrackedAttempt } from "../../lib/attempt";
-import { readJson, storageKeys, writeJson } from "../../lib/storage";
-import {
-  decodeCalculatorState,
-  defaultCalculatorState,
-  isCalculatorState,
-  type CalculatorState,
-} from "./model";
+import { removeStoredValue, storageKeys } from "../../lib/storage";
+import { defaultCalculatorState, type CalculatorState } from "./model";
 
 type CalculatorStore = {
   calculator: CalculatorState;
@@ -16,28 +11,17 @@ type CalculatorStore = {
   updateLimits: (limit: number, perAttempt: number | null) => void;
 };
 
-function initialCalculator(): CalculatorState {
-  const hashQuery = window.location.hash.split("?")[1] ?? "";
-  const fromUrl = decodeCalculatorState(new URLSearchParams(hashQuery).get("state"));
-  return (
-    fromUrl ??
-    readJson(storageKeys.calculator, isCalculatorState) ??
-    defaultCalculatorState
-  );
-}
-
-function persist(calculator: CalculatorState): CalculatorState {
-  writeJson(storageKeys.calculator, calculator);
-  return calculator;
-}
+// Calculations are scratch work: kept in memory only. Earlier versions saved them, so drop
+// whatever an older visit left behind.
+removeStoredValue(storageKeys.calculator);
 
 export const useCalculatorStore = create<CalculatorStore>((set) => ({
-  calculator: initialCalculator(),
+  calculator: defaultCalculatorState,
   resetCalculator: () => set({ calculator: defaultCalculatorState }),
-  replaceCalculator: (calculator) => set({ calculator: persist(calculator) }),
+  replaceCalculator: (calculator) => set({ calculator }),
   updateAttempt: (attempt) =>
     set(({ calculator }) => ({
-      calculator: persist({
+      calculator: {
         ...calculator,
         attempts: calculator.attempts.map((current) =>
           current.roundId === attempt.roundId &&
@@ -45,15 +29,15 @@ export const useCalculatorStore = create<CalculatorStore>((set) => ({
             ? attempt
             : current,
         ),
-      }),
+      },
     })),
   updateLimits: (limitCentiseconds, perAttemptLimitCentiseconds) =>
     set(({ calculator }) => ({
-      calculator: persist({
+      calculator: {
         ...calculator,
         presetId: null,
         limitCentiseconds,
         perAttemptLimitCentiseconds,
-      }),
+      },
     })),
 }));

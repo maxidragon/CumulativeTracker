@@ -18,7 +18,7 @@ export function TimeSettingField({
   const formattedValue =
     value === null
       ? ""
-      : formatTime(value, { compact: true, preserveCentiseconds: true });
+      : formatTime(value);
   const [draft, setDraft] = useState(formattedValue);
   const [previousValue, setPreviousValue] = useState(value);
   const [error, setError] = useState(false);
@@ -43,7 +43,7 @@ export function TimeSettingField({
       return;
     }
     setError(false);
-    setDraft(formatTime(parsed, { compact: true, preserveCentiseconds: true }));
+    setDraft(formatTime(parsed));
     if (parsed !== value) onCommit(parsed);
   };
 

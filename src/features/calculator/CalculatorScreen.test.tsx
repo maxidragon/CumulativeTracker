@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { beforeEach, describe, expect, it } from "vitest";
 import { CalculatorScreen } from "./CalculatorScreen";
-import { defaultCalculatorState, encodeCalculatorState } from "./model";
+import { defaultCalculatorState } from "./model";
 import { useCalculatorStore } from "./store";
 
 function renderCalculator() {
@@ -34,18 +34,28 @@ describe("CalculatorScreen", () => {
 
     const remainingCard = screen.getByText("Remaining").parentElement;
     if (!remainingCard) throw new Error("Remaining card was not rendered.");
-    expect(within(remainingCard).getByText("10:00")).toBeInTheDocument();
-    expect(localStorage.getItem("ct:v1:calculator")).toContain('"centiseconds":60000');
+    expect(within(remainingCard).getByText("10:00.00")).toBeInTheDocument();
+    expect(localStorage.getItem("ct:v1:calculator")).toBeNull();
     await waitFor(() =>
       expect(window.location.href).not.toBe(""),
     );
+  });
+
+  it("offers DNS the rest once any attempt is entered", () => {
+    renderCalculator();
+    const dnsRest = screen.getByRole("button", { name: "DNS the rest" });
+    expect(dnsRest).toBeDisabled();
+    const input = screen.getByLabelText("Attempt 1");
+    for (const key of "30000") fireEvent.keyDown(input, { key });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(dnsRest).toBeEnabled();
   });
 
   it("shows an upper bound when a DNF has no elapsed time", () => {
     renderCalculator();
     fireEvent.keyDown(screen.getByLabelText("Attempt 1"), { key: "d" });
     expect(screen.getByText(/1 DNF is missing elapsed time/i)).toBeInTheDocument();
-    expect(screen.getAllByText("≤ 20:00")).toHaveLength(2);
+    expect(screen.getByText("≤ 20:00.00")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Stopped at the limit" })).toBeDisabled();
   });
 
@@ -61,7 +71,7 @@ describe("CalculatorScreen", () => {
     const user = userEvent.setup();
     renderCalculator();
     await user.click(screen.getByLabelText("Cumulative limit"));
-    await user.click(screen.getByRole("option", { name: "60:00" }));
+    await user.click(screen.getByRole("option", { name: "1:00:00.00" }));
     expect(useCalculatorStore.getState().calculator.limitCentiseconds).toBe(360_000);
   });
 
@@ -82,7 +92,7 @@ describe("CalculatorScreen", () => {
     renderCalculator();
     await user.click(screen.getByRole("button", { name: "Stopped at the limit" }));
     expect(screen.getByRole("dialog")).toHaveTextContent(
-      "Attempt 1 will be recorded as DNF at exactly 20:00.",
+      "Attempt 1 will be recorded as DNF at exactly 20:00.00, and the attempts after it as DNS.",
     );
     expect(screen.getByRole("button", { name: "Record DNF" })).toBeEnabled();
     await user.click(screen.getByRole("button", { name: "Cancel" }));
@@ -95,7 +105,7 @@ describe("CalculatorScreen", () => {
     expect(reset).toBeDisabled();
 
     await user.click(screen.getByLabelText("Cumulative limit"));
-    await user.click(screen.getByRole("option", { name: "60:00" }));
+    await user.click(screen.getByRole("option", { name: "1:00:00.00" }));
     const input = screen.getByLabelText("Attempt 1");
     for (const key of "60000") fireEvent.keyDown(input, { key });
     fireEvent.keyDown(input, { key: "Enter" });
@@ -109,13 +119,5 @@ describe("CalculatorScreen", () => {
     expect(calculator.attempts).toHaveLength(3);
     expect(calculator.limitCentiseconds).toBe(360_000);
     expect(screen.getByLabelText("Attempt 1")).toHaveValue("");
-  });
-
-  it("encodes the current state for a shareable URL", async () => {
-    renderCalculator();
-    const encoded = encodeCalculatorState(defaultCalculatorState);
-    await waitFor(() => {
-      expect(screen.getByTestId("location")).toHaveTextContent(`?state=${encoded}`);
-    });
   });
 });

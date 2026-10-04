@@ -1,5 +1,5 @@
 import { attemptsForFormat, groupKey, type RoundFormat } from "../../lib/cumulative";
-import { isTrackedAttempt, type TrackedAttempt } from "../../lib/attempt";
+import type { TrackedAttempt } from "../../lib/attempt";
 
 export type CalculatorRound = {
   roundId: string;
@@ -159,84 +159,4 @@ export const defaultCalculatorState = stateFromPreset(defaultPreset);
 
 export function calculatorGroupKey(state: CalculatorState): string {
   return groupKey(state.rounds.map(({ roundId }) => roundId));
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-export function isCalculatorState(value: unknown): value is CalculatorState {
-  if (!isRecord(value) || value.version !== 1) return false;
-  if (
-    !Number.isSafeInteger(value.limitCentiseconds) ||
-    (value.limitCentiseconds as number) <= 0 ||
-    !Array.isArray(value.rounds) ||
-    value.rounds.length === 0 ||
-    !Array.isArray(value.attempts)
-  ) {
-    return false;
-  }
-  if (
-    value.perAttemptLimitCentiseconds !== null &&
-    (!Number.isSafeInteger(value.perAttemptLimitCentiseconds) ||
-      (value.perAttemptLimitCentiseconds as number) <= 0)
-  ) {
-    return false;
-  }
-  if (value.presetId !== null && typeof value.presetId !== "string") return false;
-
-  const roundsValid = value.rounds.every(
-    (round) =>
-      isRecord(round) &&
-      typeof round.roundId === "string" &&
-      typeof round.eventId === "string" &&
-      typeof round.eventName === "string" &&
-      ["1", "2", "3", "5", "a", "m"].includes(String(round.format)),
-  );
-  const roundIds = new Set(
-    value.rounds
-      .filter(isRecord)
-      .map((round) => round.roundId)
-      .filter((roundId): roundId is string => typeof roundId === "string"),
-  );
-  const attemptsValid = value.attempts.every(
-    (attempt) =>
-      isTrackedAttempt(attempt) &&
-      roundIds.has(attempt.roundId) &&
-      attempt.order >= 1,
-  );
-  if (!roundsValid || !attemptsValid) return false;
-
-  const attemptKeys = value.attempts.map(
-    (attempt) => `${String((attempt as Record<string, unknown>).roundId)}:${String((attempt as Record<string, unknown>).attemptNumber)}`,
-  );
-  const orders = value.attempts.map(
-    (attempt) => (attempt as Record<string, unknown>).order,
-  );
-  return (
-    new Set(attemptKeys).size === attemptKeys.length &&
-    new Set(orders).size === orders.length
-  );
-}
-
-export function encodeCalculatorState(state: CalculatorState): string {
-  const json = JSON.stringify(state);
-  const bytes = new TextEncoder().encode(json);
-  let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
-}
-
-export function decodeCalculatorState(encoded: string | null): CalculatorState | null {
-  if (!encoded) return null;
-  try {
-    const base64 = encoded.replaceAll("-", "+").replaceAll("_", "/");
-    const padding = "=".repeat((4 - (base64.length % 4)) % 4);
-    const binary = atob(base64 + padding);
-    const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
-    const value: unknown = JSON.parse(new TextDecoder().decode(bytes));
-    return isCalculatorState(value) ? value : null;
-  } catch {
-    return null;
-  }
 }

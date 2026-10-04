@@ -4,28 +4,23 @@ import {
   Box,
   Button,
   FormControl,
-  Grid,
   InputLabel,
   MenuItem,
-  Paper,
   Select,
   Stack,
   TextField,
   Typography,
 } from "@mui/material";
-import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useMemo, useState } from "react";
 import { ConfirmActionDialog } from "../../components/ConfirmActionDialog";
 import { Stat } from "../../components/Stat";
 import { formatTime } from "../../lib/attempt";
 import {
   attemptsLeft,
-  averageForRemainingAttempts,
   budgetBeforeAttempt,
   deriveBudget,
   dnsRemainingInRound,
   orderedAttempts,
-  perAttemptLimitWarning,
   stopAttemptAtLimit,
   type Budget,
 } from "../../lib/cumulative";
@@ -34,7 +29,6 @@ import {
   calculatorLimitPresets,
   clearCalculatorAttempts,
   createCustomCalculatorState,
-  encodeCalculatorState,
   type CalculatorState,
 } from "./model";
 import { useCalculatorStore } from "./store";
@@ -58,7 +52,6 @@ export function CalculatorScreen() {
   const replaceCalculator = useCalculatorStore((state) => state.replaceCalculator);
   const updateAttempt = useCalculatorStore((state) => state.updateAttempt);
   const updateLimits = useCalculatorStore((state) => state.updateLimits);
-  const [, setSearchParams] = useSearchParams();
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const [customLimit, setCustomLimit] = useState(
     !calculatorLimitPresets.some(
@@ -72,10 +65,6 @@ export function CalculatorScreen() {
     String(calculator.attempts.length),
   );
   const [customAttemptsError, setCustomAttemptsError] = useState(false);
-
-  useEffect(() => {
-    setSearchParams({ state: encodeCalculatorState(calculator) }, { replace: true });
-  }, [calculator, setSearchParams]);
 
   const budget: Budget = useMemo(
     () => ({
@@ -94,14 +83,12 @@ export function CalculatorScreen() {
     registered: true,
   }));
   const remainingAttempts = attemptsLeft(plans, calculator.attempts);
-  const average = averageForRemainingAttempts(summary, remainingAttempts);
   const nextAttempt = orderedAttempts(calculator.attempts).find(
     ({ outcome }) => outcome === "skipped",
   );
   const enteredCount = calculator.attempts.filter(
     ({ outcome }) => outcome !== "skipped",
   ).length;
-  const limitWarning = perAttemptLimitWarning(budget);
 
   const requestReplacement = (state: CalculatorState) => {
     if (enteredCount === 0) {
@@ -161,255 +148,14 @@ export function CalculatorScreen() {
     !calculatorLimitPresets.some(
       (minutes) => minutes * 6_000 === calculator.limitCentiseconds,
     );
+  const upperBound = summary.isUpperBound ? "≤ " : "";
 
   return (
-    <Stack spacing={3} sx={{ maxWidth: 760 }}>
-      <Box>
-        <Typography component="h1" variant="h4">
-          Cumulative limit calculator
+    <Stack spacing={3} sx={{ maxWidth: 1040 }}>
+      <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
+        <Typography component="h1" sx={{ flexGrow: 1 }} variant="h4">
+          Calculator
         </Typography>
-        <Typography color="text.secondary" sx={{ mt: 0.5 }}>
-          Enter the time read off the timer. For a DNF, keep its elapsed time and tick DNF
-          beside it. No login; everything stays on this device.
-        </Typography>
-      </Box>
-
-      <Paper sx={{ p: 2 }} variant="outlined">
-        <Grid container spacing={2}>
-          {customRound ? (
-            <>
-              <Grid size={{ xs: 6, sm: 4 }}>
-                <FormControl fullWidth>
-                  <InputLabel id="limit-preset-label">Cumulative limit</InputLabel>
-                  <Select
-                    label="Cumulative limit"
-                    labelId="limit-preset-label"
-                    onChange={(event) => {
-                      if (event.target.value === "custom") {
-                        setCustomLimit(true);
-                        return;
-                      }
-                      const minutes = Number(event.target.value);
-                      if (!Number.isFinite(minutes)) return;
-                      setCustomLimit(false);
-                      const next = createCustomCalculatorState(
-                        undefined,
-                        calculator.attempts.length,
-                        minutes * 6_000,
-                      );
-                      next.perAttemptLimitCentiseconds =
-                        calculator.perAttemptLimitCentiseconds;
-                      requestReplacement(next);
-                    }}
-                    value={
-                      isCustomLimit
-                        ? "custom"
-                        : String(calculator.limitCentiseconds / 6_000)
-                    }
-                  >
-                    {calculatorLimitPresets.map((minutes) => (
-                      <MenuItem key={minutes} value={minutes}>
-                        {minutes}:00
-                      </MenuItem>
-                    ))}
-                    <MenuItem value="custom">Custom limit</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid size={{ xs: 6, sm: 4 }}>
-                <FormControl fullWidth>
-                  <InputLabel id="attempt-count-label">Attempts</InputLabel>
-                  <Select
-                    label="Attempts"
-                    labelId="attempt-count-label"
-                    onChange={(event) => {
-                      if (event.target.value === "custom") {
-                        setCustomAttempts(true);
-                        setCustomAttemptsDraft(String(calculator.attempts.length));
-                        setCustomAttemptsError(false);
-                        return;
-                      }
-                      setCustomAttempts(false);
-                      const next = createCustomCalculatorState(
-                        undefined,
-                        Number(event.target.value),
-                        calculator.limitCentiseconds,
-                      );
-                      next.perAttemptLimitCentiseconds =
-                        calculator.perAttemptLimitCentiseconds;
-                      requestReplacement(next);
-                    }}
-                    value={
-                      customAttempts || ![1, 2, 3, 5].includes(calculator.attempts.length)
-                        ? "custom"
-                        : calculator.attempts.length
-                    }
-                  >
-                    {[1, 2, 3, 5].map((count) => (
-                      <MenuItem key={count} value={count}>
-                        {count}
-                      </MenuItem>
-                    ))}
-                    <MenuItem value="custom">
-                      Custom
-                    </MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-              {customAttempts || ![1, 2, 3, 5].includes(calculator.attempts.length) ? (
-                <Grid size={{ xs: 12, sm: 4 }}>
-                  <TextField
-                    error={customAttemptsError}
-                    fullWidth
-                    helperText={customAttemptsError ? "Enter a whole number from 1 to 100." : "1–100 attempts"}
-                    label="Custom attempts"
-                    onBlur={commitCustomAttempts}
-                    onChange={(event) => {
-                      setCustomAttemptsDraft(event.target.value);
-                      setCustomAttemptsError(false);
-                    }}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        event.preventDefault();
-                        commitCustomAttempts();
-                      }
-                    }}
-                    slotProps={{ htmlInput: { inputMode: "numeric", min: 1, max: 100 } }}
-                    type="number"
-                    value={customAttemptsDraft}
-                  />
-                </Grid>
-              ) : null}
-            </>
-          ) : null}
-
-          {isCustomLimit ? (
-            <Grid size={{ xs: 12, sm: 4 }}>
-              <TimeSettingField
-                label="Custom cumulative limit"
-                onCommit={(limit) => {
-                  if (limit !== null) {
-                    updateLimits(limit, calculator.perAttemptLimitCentiseconds);
-                  }
-                }}
-                value={calculator.limitCentiseconds}
-              />
-            </Grid>
-          ) : null}
-          <Grid size={{ xs: 12, sm: 4 }}>
-            <TimeSettingField
-              label="Per-attempt limit"
-              onCommit={(perAttempt) =>
-                updateLimits(calculator.limitCentiseconds, perAttempt)
-              }
-              optional
-              value={calculator.perAttemptLimitCentiseconds}
-            />
-          </Grid>
-        </Grid>
-        {limitWarning ? (
-          <Alert severity="warning" sx={{ mt: 2 }}>
-            {limitWarning}
-          </Alert>
-        ) : null}
-      </Paper>
-
-      <Box
-        aria-live="polite"
-        sx={{ display: "grid", gap: 2, gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)" }}
-      >
-        <Stat
-          caption={`used ${formatTime(summary.usedCentiseconds, { compact: true })} of ${formatTime(calculator.limitCentiseconds, { compact: true })}`}
-          label="Remaining"
-          value={`${summary.isUpperBound ? "≤ " : ""}${formatTime(Math.max(0, summary.remainingCentiseconds), { compact: true })}`}
-        />
-        <Stat
-          caption={`${remainingAttempts} attempt${remainingAttempts === 1 ? "" : "s"} left${average !== null && remainingAttempts > 1 ? ` · avg ${formatTime(average, { compact: true })} each` : ""}`}
-          emphasis
-          label="Next attempt cap"
-          value={`${summary.isUpperBound ? "≤ " : ""}${formatTime(Math.max(0, summary.capForNextAttemptCentiseconds), { compact: true })}`}
-        />
-      </Box>
-
-      {summary.unknownCount > 0 ? (
-        <Alert severity="warning">
-          {summary.unknownCount} DNF{summary.unknownCount === 1 ? " is" : "s are"} missing
-          elapsed time. Remaining and cap are upper bounds.
-        </Alert>
-      ) : null}
-      {summary.exhausted ? (
-        <Alert severity="error">The cumulative limit is exhausted.</Alert>
-      ) : null}
-
-      <Stack spacing={1.5}>
-        {orderedAttempts(calculator.attempts).map((attempt, index) => {
-          const before = budgetBeforeAttempt(
-            budget,
-            attempt.roundId,
-            attempt.attemptNumber,
-          );
-          return (
-            <Box
-              data-attempt-key={`${attempt.roundId}:${attempt.attemptNumber}`}
-              key={`${attempt.roundId}:${attempt.attemptNumber}`}
-            >
-              <AttemptInput
-                attempt={attempt}
-                capCentiseconds={Math.max(0, before.capForNextAttemptCentiseconds)}
-                label={`Attempt ${attempt.attemptNumber}`}
-                onCommit={updateAttempt}
-                onMove={(direction) => {
-                  const fields = document.querySelectorAll<HTMLInputElement>(
-                    "[data-attempt-key] input[type='tel']",
-                  );
-                  const offset = direction === "next" ? 1 : -1;
-                  fields.item(index + offset)?.focus();
-                }}
-              />
-            </Box>
-          );
-        })}
-      </Stack>
-
-      <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-        <Button
-          disabled={!nextAttempt || summary.isUpperBound || summary.exhausted}
-          onClick={() => {
-            if (!nextAttempt) return;
-            setPendingAction({
-              kind: "stop",
-              roundId: nextAttempt.roundId,
-              attemptNumber: nextAttempt.attemptNumber,
-              description: `Attempt ${nextAttempt.attemptNumber} will be recorded as DNF at exactly ${formatTime(summary.remainingCentiseconds, { compact: true })}.`,
-            });
-          }}
-          variant="contained"
-        >
-          Stopped at the limit
-        </Button>
-        <Button
-          color="warning"
-          disabled={!nextAttempt || !summary.exhausted}
-          onClick={() => {
-            if (!nextAttempt) return;
-            const round = calculator.rounds.find(
-              ({ roundId }) => roundId === nextAttempt.roundId,
-            );
-            const count = calculator.attempts.filter(
-              (attempt) =>
-                attempt.roundId === nextAttempt.roundId && attempt.outcome === "skipped",
-            ).length;
-            setPendingAction({
-              kind: "dns",
-              roundId: nextAttempt.roundId,
-              description: `${count} remaining attempt${count === 1 ? "" : "s"} in ${round?.eventName ?? nextAttempt.roundId} will be marked DNS. Other rounds in this shared group will not be changed.`,
-            });
-          }}
-          variant="outlined"
-        >
-          DNS the rest
-        </Button>
-        <Box sx={{ flexGrow: 1 }} />
         <Button
           disabled={enteredCount === 0}
           onClick={() =>
@@ -423,6 +169,235 @@ export function CalculatorScreen() {
           Reset
         </Button>
       </Stack>
+
+      <Box
+        sx={{
+          alignItems: "start",
+          display: "grid",
+          gap: { xs: 3, md: 5 },
+          gridTemplateColumns: { xs: "minmax(0, 1fr)", md: "300px minmax(0, 1fr)" },
+        }}
+      >
+        <Stack spacing={3}>
+          <Stack spacing={2}>
+            {customRound ? (
+              <>
+                <Box>
+                  <FormControl fullWidth>
+                    <InputLabel id="limit-preset-label">Cumulative limit</InputLabel>
+                    <Select
+                      label="Cumulative limit"
+                      labelId="limit-preset-label"
+                      onChange={(event) => {
+                        if (event.target.value === "custom") {
+                          setCustomLimit(true);
+                          return;
+                        }
+                        const minutes = Number(event.target.value);
+                        if (!Number.isFinite(minutes)) return;
+                        setCustomLimit(false);
+                        const next = createCustomCalculatorState(
+                          undefined,
+                          calculator.attempts.length,
+                          minutes * 6_000,
+                        );
+                        next.perAttemptLimitCentiseconds =
+                          calculator.perAttemptLimitCentiseconds;
+                        requestReplacement(next);
+                      }}
+                      value={
+                        isCustomLimit
+                          ? "custom"
+                          : String(calculator.limitCentiseconds / 6_000)
+                      }
+                    >
+                      {calculatorLimitPresets.map((minutes) => (
+                        <MenuItem key={minutes} value={minutes}>
+                          {formatTime(minutes * 6_000)}
+                        </MenuItem>
+                      ))}
+                      <MenuItem value="custom">Custom limit</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Box>
+                {isCustomLimit ? (
+                  <Box>
+                    <TimeSettingField
+                      label="Custom cumulative limit"
+                      onCommit={(limit) => {
+                        if (limit !== null) {
+                          updateLimits(limit, calculator.perAttemptLimitCentiseconds);
+                        }
+                      }}
+                      value={calculator.limitCentiseconds}
+                    />
+                  </Box>
+                ) : null}
+                <Box>
+                  <FormControl fullWidth>
+                    <InputLabel id="attempt-count-label">Attempts</InputLabel>
+                    <Select
+                      label="Attempts"
+                      labelId="attempt-count-label"
+                      onChange={(event) => {
+                        if (event.target.value === "custom") {
+                          setCustomAttempts(true);
+                          setCustomAttemptsDraft(String(calculator.attempts.length));
+                          setCustomAttemptsError(false);
+                          return;
+                        }
+                        setCustomAttempts(false);
+                        const next = createCustomCalculatorState(
+                          undefined,
+                          Number(event.target.value),
+                          calculator.limitCentiseconds,
+                        );
+                        next.perAttemptLimitCentiseconds =
+                          calculator.perAttemptLimitCentiseconds;
+                        requestReplacement(next);
+                      }}
+                      value={
+                        customAttempts || ![1, 2, 3, 5].includes(calculator.attempts.length)
+                          ? "custom"
+                          : calculator.attempts.length
+                      }
+                    >
+                      {[1, 2, 3, 5].map((count) => (
+                        <MenuItem key={count} value={count}>
+                          {count}
+                        </MenuItem>
+                      ))}
+                      <MenuItem value="custom">
+                        Custom
+                      </MenuItem>
+                    </Select>
+                  </FormControl>
+                </Box>
+                {customAttempts || ![1, 2, 3, 5].includes(calculator.attempts.length) ? (
+                  <Box>
+                    <TextField
+                      error={customAttemptsError}
+                      fullWidth
+                      helperText={customAttemptsError ? "Enter a whole number from 1 to 100." : "1–100 attempts"}
+                      label="Custom attempts"
+                      onBlur={commitCustomAttempts}
+                      onChange={(event) => {
+                        setCustomAttemptsDraft(event.target.value);
+                        setCustomAttemptsError(false);
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          commitCustomAttempts();
+                        }
+                      }}
+                      slotProps={{ htmlInput: { inputMode: "numeric", min: 1, max: 100 } }}
+                      type="number"
+                      value={customAttemptsDraft}
+                    />
+                  </Box>
+                ) : null}
+              </>
+            ) : null}
+
+          </Stack>
+
+          <Stack aria-live="polite" spacing={2}>
+            <Stat
+              caption={`${remainingAttempts} attempt${remainingAttempts === 1 ? "" : "s"} left`}
+              emphasis
+              label="Remaining"
+              value={`${upperBound}${formatTime(Math.max(0, summary.remainingCentiseconds))}`}
+            />
+            <Stat
+              caption={`of ${formatTime(calculator.limitCentiseconds)}`}
+              label="Used"
+              value={formatTime(summary.usedCentiseconds)}
+            />
+          </Stack>
+
+          {summary.unknownCount > 0 ? (
+            <Alert severity="warning">
+              {summary.unknownCount} DNF{summary.unknownCount === 1 ? " is" : "s are"} missing
+              elapsed time, so the remaining time is an upper bound.
+            </Alert>
+          ) : null}
+          {summary.exhausted ? (
+            <Alert severity="error">The cumulative limit is exhausted.</Alert>
+          ) : null}
+        </Stack>
+
+        <Stack spacing={2}>
+          <Stack spacing={1.5}>
+            {orderedAttempts(calculator.attempts).map((attempt, index) => {
+              const before = budgetBeforeAttempt(
+                budget,
+                attempt.roundId,
+                attempt.attemptNumber,
+              );
+              return (
+                <Box
+                  data-attempt-key={`${attempt.roundId}:${attempt.attemptNumber}`}
+                  key={`${attempt.roundId}:${attempt.attemptNumber}`}
+                >
+                  <AttemptInput
+                    attempt={attempt}
+                    capCentiseconds={Math.max(0, before.capForNextAttemptCentiseconds)}
+                    label={`Attempt ${attempt.attemptNumber}`}
+                    onCommit={updateAttempt}
+                    onMove={(direction) => {
+                      const fields = document.querySelectorAll<HTMLInputElement>(
+                        "[data-attempt-key] input[type='tel']",
+                      );
+                      const offset = direction === "next" ? 1 : -1;
+                      fields.item(index + offset)?.focus();
+                    }}
+                  />
+                </Box>
+              );
+            })}
+          </Stack>
+          <Stack direction="row" sx={{ flexWrap: "wrap", gap: 1 }}>
+            <Button
+              disabled={!nextAttempt || summary.isUpperBound || summary.exhausted}
+              onClick={() => {
+                if (!nextAttempt) return;
+                setPendingAction({
+                  kind: "stop",
+                  roundId: nextAttempt.roundId,
+                  attemptNumber: nextAttempt.attemptNumber,
+                  description: `Attempt ${nextAttempt.attemptNumber} will be recorded as DNF at exactly ${formatTime(summary.remainingCentiseconds)}, and the attempts after it as DNS.`,
+                });
+              }}
+              variant="outlined"
+            >
+              Stopped at the limit
+            </Button>
+            <Button
+              color="warning"
+              disabled={!nextAttempt || enteredCount === 0}
+              onClick={() => {
+                if (!nextAttempt) return;
+                const round = calculator.rounds.find(
+                  ({ roundId }) => roundId === nextAttempt.roundId,
+                );
+                const count = calculator.attempts.filter(
+                  (attempt) =>
+                    attempt.roundId === nextAttempt.roundId && attempt.outcome === "skipped",
+                ).length;
+                setPendingAction({
+                  kind: "dns",
+                  roundId: nextAttempt.roundId,
+                  description: `${count} remaining attempt${count === 1 ? "" : "s"} in ${round?.eventName ?? nextAttempt.roundId} will be marked DNS. Other rounds in this shared group will not be changed.`,
+                });
+              }}
+              variant="outlined"
+            >
+              DNS the rest
+            </Button>
+          </Stack>
+        </Stack>
+      </Box>
 
       <ConfirmActionDialog
         confirmLabel={pendingAction ? dialogText[pendingAction.kind].confirm : ""}
