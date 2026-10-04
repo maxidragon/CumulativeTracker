@@ -190,7 +190,7 @@ describe("budget actions", () => {
     expect(next.attempts[1]).toMatchObject({ outcome: "dnf", centiseconds: 30_000 });
   });
 
-  it("marks the round's untaken attempts DNS after stopping at the limit", () => {
+  it("marks every untaken attempt in the group DNS after stopping at the limit", () => {
     const current = budget({
       limitCentiseconds: 120_000,
       attempts: [
@@ -201,8 +201,25 @@ describe("budget actions", () => {
       ],
     });
     const next = stopAttemptAtLimit(current, "444bf-r1", 2);
-    expect(next.attempts.map(({ outcome }) => outcome)).toEqual(["ok", "dnf", "dns", "skipped"]);
+    expect(next.attempts.map(({ outcome }) => outcome)).toEqual(["ok", "dnf", "dns", "dns"]);
+    expect(next.attempts[1]).toMatchObject({ centiseconds: 30_000 });
     expect(next.attempts[2]).toMatchObject({ auto: true, centiseconds: null });
+    expect(deriveBudget(next).remainingCentiseconds).toBe(0);
+  });
+
+  it("stops at what every entered attempt left, even when one was ordered after it", () => {
+    const current = budget({
+      limitCentiseconds: 120_000,
+      attempts: [
+        tracked("444bf-r1", 1, "ok", 50_000, 1),
+        tracked("444bf-r1", 2, "skipped", null, 2),
+        tracked("555bf-r1", 1, "ok", 40_000, 3),
+      ],
+    });
+    const next = stopAttemptAtLimit(current, "444bf-r1", 2);
+    expect(next.attempts[1]).toMatchObject({ outcome: "dnf", centiseconds: 30_000, order: 3 });
+    expect(next.attempts[2]).toMatchObject({ order: 2 });
+    expect(deriveBudget(next).remainingCentiseconds).toBe(0);
   });
 
   it("refuses stop-at-limit while an elapsed time is unknown", () => {

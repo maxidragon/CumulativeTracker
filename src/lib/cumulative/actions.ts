@@ -1,5 +1,5 @@
 import type { TrackedAttempt } from "../attempt";
-import { budgetBeforeAttempt } from "./budget";
+import { attemptKey, budgetBeforeAttempt, orderedAttempts, reorderAttempts } from "./budget";
 import type { Budget } from "./model";
 
 export function dnsRemainingInRound(
@@ -24,9 +24,26 @@ export function dnsRemainingInRound(
   );
 }
 
+function untakenAsDns(attempt: TrackedAttempt, enteredAt: string): TrackedAttempt {
+  return attempt.outcome === "skipped"
+    ? {
+        ...attempt,
+        outcome: "dns",
+        centiseconds: null,
+        estimated: false,
+        enteredAt,
+        auto: true,
+        syncStatus: "local" as const,
+        syncError: undefined,
+        remoteResult: undefined,
+      }
+    : attempt;
+}
+
 /**
- * The judge stopped this attempt at the cap (A1a4): it is a DNF at exactly the remaining time,
- * and with the limit spent, the round's untaken attempts become DNS.
+ * The judge stopped this attempt at the cap (A1a4). Whatever order was set before, it is now the
+ * last attempt done, so it moves after every entered attempt; it becomes a DNF at exactly what
+ * those left, and with the shared limit spent, every untaken attempt in the group is DNS.
  */
 export function stopAttemptAtLimit(
   budget: Budget,
@@ -34,15 +51,27 @@ export function stopAttemptAtLimit(
   attemptNumber: number,
   enteredAt = new Date().toISOString(),
 ): Budget {
-  if (
-    !budget.attempts.some(
-      (attempt) => attempt.roundId === roundId && attempt.attemptNumber === attemptNumber,
-    )
-  ) {
-    throw new Error("The attempt to stop was not found in this budget.");
-  }
+  const ordered = orderedAttempts(budget.attempts);
+  const target = ordered.find(
+    (attempt) => attempt.roundId === roundId && attempt.attemptNumber === attemptNumber,
+  );
+  if (!target) throw new Error("The attempt to stop was not found in this budget.");
 
-  const summary = budgetBeforeAttempt(budget, roundId, attemptNumber);
+  const others = ordered.filter((attempt) => attempt !== target);
+  let insertAt = 0;
+  others.forEach((attempt, index) => {
+    if (attempt.outcome !== "skipped") insertAt = index + 1;
+  });
+  others.splice(insertAt, 0, target);
+  const reordered = {
+    ...budget,
+    attempts: reorderAttempts(
+      budget.attempts,
+      others.map((attempt) => attemptKey(attempt.roundId, attempt.attemptNumber)),
+    ),
+  };
+
+  const summary = budgetBeforeAttempt(reordered, roundId, attemptNumber);
   if (summary.isUpperBound) {
     throw new Error("Cannot stop at the limit while a DNF elapsed time is unknown.");
   }
@@ -50,22 +79,21 @@ export function stopAttemptAtLimit(
     throw new Error("The cumulative limit is already exhausted.");
   }
 
-  const attempts = budget.attempts.map((attempt) => {
-    if (attempt.roundId !== roundId || attempt.attemptNumber !== attemptNumber) {
-      return attempt;
-    }
-    return {
-      ...attempt,
-      outcome: "dnf" as const,
-      centiseconds: summary.remainingCentiseconds,
-      estimated: false,
-      enteredAt,
-      auto: false,
-      syncStatus: "local" as const,
-      syncError: undefined,
-      remoteResult: undefined,
-    };
-  });
+  const attempts = reordered.attempts.map((attempt) =>
+    attempt.roundId === roundId && attempt.attemptNumber === attemptNumber
+      ? {
+          ...attempt,
+          outcome: "dnf" as const,
+          centiseconds: summary.remainingCentiseconds,
+          estimated: false,
+          enteredAt,
+          auto: false,
+          syncStatus: "local" as const,
+          syncError: undefined,
+          remoteResult: undefined,
+        }
+      : untakenAsDns(attempt, enteredAt),
+  );
 
-  return { ...budget, attempts: dnsRemainingInRound(attempts, roundId, enteredAt) };
+  return { ...budget, attempts };
 }
