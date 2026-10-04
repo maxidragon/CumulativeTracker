@@ -113,7 +113,8 @@ competitor time they do not have.
 ### Exhaustion
 
 When `remaining <= 0` after an attempt is entered, the app offers — never performs silently —
-**DNS the rest**: every `"skipped"` attempt in the *same round* becomes DNS
+**DNS the rest** (available once at least one attempt is entered): every `"skipped"` attempt in
+the *same round* becomes DNS
 ([A1a2+++++](https://www.worldcubeassociation.org/regulations/#A1a2)). Rounds of other events
 in the same group are a separate judgement call by the Delegate, so the app lists them as
 affected and leaves them alone.
@@ -125,7 +126,8 @@ One action, available when `remaining > 0` and no elapsed time is unknown:
 1. Set `centiseconds = remaining` — the attempt ran exactly to the cap
    ([A1a4](https://www.worldcubeassociation.org/regulations/#A1a4)).
 2. Set `outcome = "dnf"`.
-3. Offer "DNS the rest" as above.
+3. Apply "DNS the rest" as above: the round's untaken attempts become DNS (flagged "auto").
+   Rounds of other events in the group stay untouched, for the same reason.
 4. In WCA Live mode, submit `-1` for that attempt. The elapsed time stays local — WCA Live has
    nowhere to put it.
 

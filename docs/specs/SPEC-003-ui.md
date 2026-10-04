@@ -13,9 +13,9 @@ only ever serves `index.html`, and deep links work without any server-side coope
 
 | Route | Screen |
 | --- | --- |
-| `#/` | Home: open a competition by id (managed and recent competitions listed below), or start a calculator |
-| `#/calculator` | Calculator, state encoded in the route's query string |
-| `#/c/:competitionId` | Competition overview: cumulative groups, rounds, mode switch, sign-in and token state |
+| `#/` | Home: a single competition search (WCA name search; recent competitions shown before typing; a bare id opens directly), and below it the signed-in user's managed competitions that ended at most a week ago, soonest first, with city, country and dates. The calculator lives in the navbar |
+| `#/calculator` | Calculator; nothing is saved, a reload starts fresh |
+| `#/c/:competitionId` | Competition overview: one card per cumulative time limit (limit, then its events and rounds), full width; WCA Live mode and token live in a dialog behind a header button |
 | `#/c/:competitionId/g/:groupKey` | Group workspace: every competitor in the group with their budget |
 | `#/c/:competitionId/g/:groupKey/:registrantId` | Group workspace with that competitor's entry panel open |
 | `#/settings` | Theme, stored tokens, stored competition data, clear-everything |
@@ -47,11 +47,13 @@ token, return route restored, message shown.
 
 ## The attempt input
 
-This is the component everything else hangs off. It is **one time field with a DNF tickbox next
+This is the component everything else hangs off. It is **one time field with a DNF toggle button next
 to it**, not a field that holds either a time or the word DNF:
 
 ```
-  Attempt 2   [   10:00.00   ]  [x] DNF   [ ] DNS        counts 10:00 · cap was 12:41
+  ┌ Attempt 2 ─────────────┐ ┏━━━━━┓ ┌─────┐
+  │ 10:00.00               │ ┃ DNF ┃ │ DNS │
+  └────────────────────────┘ ┗━━━━━┛ └─────┘
 ```
 
 The reason is [A1a5](https://www.worldcubeassociation.org/regulations/#A1a5): a DNF spends its
@@ -68,19 +70,18 @@ Behaviour:
   typing `25000` shows `2:50.00` and `12345` shows `1:23.45` — with leading zeros and colons
   stripped. Digits are slots, not a count of centiseconds. A slot may overflow as it can in
   WCA Live (`9999` is 99.99 seconds, committed as `1:39.99`), and input stops at eight digits.
-- **DNF** is a tickbox beside the field. Ticking it does not clear or disable the time; the
-  field keeps the elapsed time and the helper text changes to `counts 10:00 towards the limit`.
-  The WCA Live keys `d`, `D`, `/` and `#` toggle the tickbox from inside the field, so the
+- **DNF** is a toggle button beside the field. Ticking it does not clear or disable the time; the
+  field keeps the elapsed time, which still counts towards the limit.
+  The WCA Live keys `d`, `D`, `/` and `#` toggle it from inside the field, so the
   familiar keystroke still works and now keeps the time instead of replacing it.
-- **DNS** is a second tickbox. It is the one outcome with no time: ticking it empties and
+- **DNS** is a second toggle button. It is the one outcome with no time: ticking it empties and
   disables the time field, because a solve that never started spends nothing
   ([A1a2+++++](https://www.worldcubeassociation.org/regulations/#A1a2)). Keys `s`, `S`, `*`.
   DNF and DNS are mutually exclusive.
 - An empty time with DNF ticked is **allowed** and is the honest record of a DNF nobody timed.
-  It shows as `elapsed time not recorded`, and it turns the competitor's remaining budget into
+  It shows as `Elapsed time not recorded`, and it turns the competitor's remaining budget into
   an upper bound until somebody fills it in
-  ([A1a2+++](https://www.worldcubeassociation.org/regulations/#A1a2)). An `estimated` toggle
-  marks a Delegate's estimate; `e` toggles it from the field.
+  ([A1a2+++](https://www.worldcubeassociation.org/regulations/#A1a2)).
 - An empty time with nothing ticked is a skipped attempt, not a zero.
 - On commit (blur, Enter or an arrow key) the time is autocompleted: 10 minutes or more truncates to whole
   seconds ([9f2](https://www.worldcubeassociation.org/regulations/#9f2)). Unparseable input
@@ -90,8 +91,9 @@ Behaviour:
 - Moving between attempts works as in WCA Live — the cursor goes field to field:
   - `Enter` commits and moves to the next attempt; `Shift+Enter` moves back.
   - `↓` and `↑` commit and move to the next or previous attempt, stopping at either end.
-  - `Tab` goes to the next attempt field. The DNF, DNS and estimated tickboxes are left out of
-    the tab order because `d`, `s` and `e` toggle them from the field; they stay clickable.
+  - `Tab` goes to the next attempt field. The DNF and DNS toggle buttons beside the field are
+    left out of the tab order because `d` and `s` toggle them from the field; they stay
+    clickable.
   - `Escape` reverts unsaved typing; pressed again (nothing left to revert) it leaves the
     scorecard for the competitor search.
   - In groups that span several events, `Alt+↑` and `Alt+↓` move the attempt earlier or later
@@ -104,24 +106,30 @@ on what happened.
 
 ## Calculator
 
-One narrow column (at most ~760px, however wide the screen), no chrome. One row of settings —
-the cumulative limit, the attempts count, the optional per-attempt limit — then the answer
-block, then the attempts, one compact line each. The answer block is the same figures every
-screen shows:
+Two columns on desktop (at most ~1040px wide), one on a phone. The left column holds the
+setup — the cumulative limit and the attempts count — and under it the answer: **Remaining** in
+the largest type, with the attempts left, then **Used** of the limit. The right column holds
+the attempts, then **Stopped at the limit** and **DNS the rest**.
 
 ```
-         REMAINING              NEXT ATTEMPT CAP
-          5:12.34                   5:12.34
-     used 14:47.66 of 20:00      2 attempts left · avg 2:36 each
+  Cumulative limit [20:00.00 ▾]     ┌ Attempt 1 ───────────┐ [DNF] [DNS]
+  Attempts         [3 ▾]            │ 14:47.66             │
+                                    └──────────────────────┘
+  REMAINING                         ┌ Attempt 2 ───────────┐ [DNF] [DNS]
+  5:12.34                           └──────────────────────┘
+  2 attempts left                   ...
+  USED
+  14:47.66
+  of 20:00.00
 ```
 
 The limit is picked from common announcements (10, 12, 15, 20, 60, 90 or 120 minutes) or typed
 as a custom limit; the attempts count is 1, 2, 3, 5 or a custom count. Presets are a
 convenience, never a claim about what a competition announced.
 
-`Reset`, below the attempts, empties every attempt for the next competitor and keeps the setup
-(limit, per-attempt limit, attempts count). It asks for confirmation and is disabled while no
-attempt is entered.
+`Reset`, beside the title, empties every attempt for the next competitor and keeps the setup
+(limit and attempts count). It asks for confirmation and is disabled while no attempt is
+entered.
 
 ## Group workspace
 
@@ -179,14 +187,16 @@ Status is never colour alone — every state carries an icon and a word:
 
 What the judge or scoretaker needs, top to bottom:
 
-1. Competitor name and registrant id.
-2. The cap for the next attempt, in the largest type on the screen, beside remaining and
-   `used … of …`.
+1. Competitor name and registrant id, shown in the competitor search field itself.
+2. One line: time used and time remaining of the cumulative limit.
 3. Warnings: missing elapsed times, exhausted budget, offline, WCA Live unreachable.
 4. The attempts, in group order, each editable in place. In WCA Live mode each entered attempt
-   carries one line of sync state with its action (`Submit`, `Retry`, or `Submit mine` /
-   `Take WCA Live` on a conflict).
-5. Actions: **Stopped at the limit**, **DNS the rest**, and **Clear competitor**.
+   carries one line of sync state, with `Submit mine` / `Take WCA Live` on a conflict.
+5. The confirm button: **Submit to WCA Live** in WCA Live mode (sends every pending attempt,
+   one request per attempt), **Done** in local mode. Either closes the scorecard and returns
+   to the competitor search; a failed submission or a conflict keeps it open instead. Enter on
+   the last attempt presses it.
+6. Actions: **Stopped at the limit**, **DNS the rest**, and **Clear competitor**.
 
 When the group spans several events the order the attempts were *done* decides how the budget
 runs out ([A1a2++++++](https://www.worldcubeassociation.org/regulations/#A1a2)), so the panel
@@ -204,7 +214,7 @@ attempts in which rounds.
 Every attempt carries a small, unambiguous state: `Local` (entered, not sent), `Sending`,
 `On WCA Live`, `Failed`. What is sent is the official result — a time, or `-1` for a ticked DNF,
 or `-2` for DNS — never the elapsed time behind a DNF. Failed attempts show the reason from
-WCA Live and a retry button.
+WCA Live; confirming the scorecard again retries them.
 Nothing is ever shown as sent that has not been acknowledged with a `200`.
 
 When the browser is offline the submit controls are **disabled with an explanation**, not
@@ -219,7 +229,7 @@ attempts sit as `Local` and can be sent when the connection is back.
   desktop and `h4` on mobile, tabular figures, so they do not reflow as digits change.
 - **Touch targets** are at least 44px; the attempt fields on mobile are full-width.
 - **Accessibility**: every interactive element is reachable and operable by keyboard — the
-  attempt tickboxes and reorder arrows through their keys in the field (declared with
+  attempt DNF/DNS toggles and reorder arrows through their keys in the field (declared with
   `aria-keyshortcuts`) rather than as tab stops; status is
   conveyed by icon + text as well as colour; live-updating numbers are announced politely via
   `aria-live` on the remaining-budget block, not on every keystroke.

@@ -41,7 +41,7 @@ pick a preset like "3BLD, best of 3, 20:00 cumulative"), enter the limit, then e
 with real WCA time input. Shows used, remaining, and the cap for the next attempt; handles DNF
 elapsed time and auto-DNS on exhaustion.
 
-State lives in the URL and in `localStorage`, so a reload or a shared link keeps the numbers.
+Nothing is saved: the numbers are scratch work, kept in memory and gone on reload.
 
 ### 2. Competition, local — no login required
 
@@ -58,7 +58,8 @@ manage instead of typing an id.
 
 ### 3. Competition, WCA Live — sign-in + scoretaking token
 
-Everything in mode 2, plus each attempt is submitted to WCA Live as it is entered, and already
+Everything in mode 2, plus the scorecard's entered attempts are submitted to WCA Live when the
+scoretaker confirms it (as WCA Live's own entry form does), and already
 entered attempts are read back from WCA Live so the budget is right even when another
 scoretaker entered some of them.
 
