@@ -63,15 +63,8 @@ export function autocompleteTime(centiseconds: number): number {
     : centiseconds;
 }
 
-type FormatTimeOptions = {
-  compact?: boolean;
-  preserveCentiseconds?: boolean;
-};
-
-export function formatTime(
-  centiseconds: number,
-  { compact = false, preserveCentiseconds = false }: FormatTimeOptions = {},
-): string {
+/** Formats a time the way WCA Live does: `9.87`, `1:02.30`, `10:00.00`, `1:02:03.45`. */
+export function formatTime(centiseconds: number): string {
   assertCentiseconds(centiseconds);
 
   const hours = Math.floor(centiseconds / CENTISECONDS_PER_HOUR);
@@ -88,14 +81,6 @@ export function formatTime(
       : minutes > 0
         ? `${minutes}:${seconds.toString().padStart(2, "0")}`
         : seconds.toString();
-
-  if (
-    !preserveCentiseconds &&
-    compact &&
-    hundredths === 0
-  ) {
-    return clock;
-  }
 
   return `${clock}.${hundredths.toString().padStart(2, "0")}`;
 }
