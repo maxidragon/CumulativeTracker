@@ -15,7 +15,7 @@ This is the part that must be right. Everything else is presentation.
 | [A1a2+++](https://www.worldcubeassociation.org/regulations/#A1a2) | If a time is unavailable, the Delegate's estimate counts towards the limit but is not an official result | A recorded time may be flagged `estimated`; it is never submitted as a result |
 | [A1a2+++++](https://www.worldcubeassociation.org/regulations/#A1a2) | On reaching a cumulative limit, every remaining attempt **in the round** is DNS | Auto-DNS action, scoped per round |
 | [A1a2++++++](https://www.worldcubeassociation.org/regulations/#A1a2) | For multi-event groups, attempts count in the order they were done, and that order should be on the scorecard | Attempts in a group are ordered chronologically, and the order is editable |
-| [A1a4](https://www.worldcubeassociation.org/regulations/#A1a4) | When the timer reaches the limit, the judge stops the solve and records DNF | The "stopped at the limit" action |
+| [A1a4](https://www.worldcubeassociation.org/regulations/#A1a4) | The solve must end *before* the limit is reached; when the timer reaches it, the judge stops the solve and records DNF | The "stopped at the limit" action; a solved time of exactly the cap is flagged as a DNF |
 | [A1a5](https://www.worldcubeassociation.org/regulations/#A1a5) | Time counting towards the limit = result after penalties, or elapsed time if DNF | `countedTime()` below |
 | [9f2](https://www.worldcubeassociation.org/regulations/#9f2) | Results of 10 minutes or more are measured and truncated to seconds | Input autocompletes by truncating over 10:00 |
 | [9g](https://www.worldcubeassociation.org/regulations/#9g) | A cutoff round: fail the cutoff phase and the remaining attempts are not taken | Attempts a competitor will not take stop counting as "attempts left" |
@@ -126,9 +126,12 @@ One action, available when `remaining > 0` and no elapsed time is unknown:
 1. Set `centiseconds = remaining` — the attempt ran exactly to the cap
    ([A1a4](https://www.worldcubeassociation.org/regulations/#A1a4)).
 2. Set `outcome = "dnf"`.
-3. Apply "DNS the rest" as above: the round's untaken attempts become DNS (flagged "auto").
-   Rounds of other events in the group stay untouched, for the same reason.
-4. In WCA Live mode, submit `-1` for that attempt. The elapsed time stays local — WCA Live has
+3. The stopped attempt becomes the last one done: it moves after every entered attempt, so
+   `remaining` is what all of them left, whatever order was set before.
+4. The shared limit is now spent, so every untaken attempt in the group — in any round —
+   becomes DNS (flagged "auto"). Unlike "DNS the rest", there is no judgement call left: none of
+   them can be taken.
+5. In WCA Live mode, submit `-1` for that attempt. The elapsed time stays local — WCA Live has
    nowhere to put it.
 
 ## Edge cases and how they resolve

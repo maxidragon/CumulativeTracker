@@ -182,7 +182,8 @@ When results are read back for a round, per competitor and attempt number:
 | skipped | a value | Take WCA Live's value; if it is DNF, mark the elapsed time unknown |
 | a value, `On WCA Live`, equal | equal | Nothing to do |
 | a value, `On WCA Live`, different | different | Somebody changed it elsewhere: take WCA Live's value, keep our elapsed time, flag the row as changed remotely |
-| a value, `Local` or `Failed` | a value | Keep ours, show both, offer "submit mine" or "take WCA Live's" |
+| a value, `Local` or `Failed` | a value | Keep ours and show both; confirming the scorecard submits ours over WCA Live's, or "use WCA Live's" takes theirs |
+| skipped, cleared here (`Local`) | a value | Keep it empty; confirming the scorecard sends `0`, which WCA Live treats as no attempt |
 | a DNF with elapsed time | DNF | Keep the elapsed time. WCA Live cannot store it |
 
 Merging never happens silently in the direction that loses a locally recorded elapsed time.

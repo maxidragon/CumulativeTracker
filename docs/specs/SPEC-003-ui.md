@@ -191,7 +191,8 @@ What the judge or scoretaker needs, top to bottom:
 2. One line: time used and time remaining of the cumulative limit.
 3. Warnings: missing elapsed times, exhausted budget, offline, WCA Live unreachable.
 4. The attempts, in group order, each editable in place. In WCA Live mode each entered attempt
-   carries one line of sync state, with `Submit mine` / `Take WCA Live` on a conflict.
+   carries one line of sync state. Where WCA Live holds a different value it says so, with a
+   `Use WCA Live's` button; otherwise confirming the scorecard submits ours over it.
 5. The confirm button: **Submit to WCA Live** in WCA Live mode (sends every pending attempt,
    one request per attempt), **Done** in local mode. Either closes the scorecard and returns
    to the competitor search; a failed submission or a conflict keeps it open instead. Enter on
@@ -200,9 +201,10 @@ What the judge or scoretaker needs, top to bottom:
 
 When the group spans several events the order the attempts were *done* decides how the budget
 runs out ([A1a2++++++](https://www.worldcubeassociation.org/regulations/#A1a2)), so the panel
-says so above the list and makes the sequence explicit: every attempt carries a numbered badge
-(its place in the sequence), the event icon, a drag handle, and "done earlier" / "done later"
-buttons, which `Alt+↑` / `Alt+↓` press from the field. Fields are labelled by event id (`444bf · attempt 1`). A single-event group has only
+says so above the list and makes the sequence explicit: every attempt is a card with a large
+drag handle down its left edge, a numbered badge (its place in the sequence), the event icon,
+and "done earlier" / "done later"
+buttons, which `Alt+↑` / `Alt+↓` press from the field. Fields are labelled by the event's short name (`4x4 BLD · attempt 1`). A single-event group has only
 one possible order, shows none of this, and labels fields `Attempt 1`.
 
 Destructive or regulation-bearing actions — "stopped at the limit", "DNS the rest", clearing a
