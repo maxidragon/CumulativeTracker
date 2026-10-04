@@ -4,7 +4,7 @@ import { renderHook, waitFor } from "@testing-library/react";
 import type { PropsWithChildren } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { storageKeys, writeJson } from "../../lib/storage";
-import { cacheAge, useCompetitionData } from "./data";
+import { cacheAge, storedCompetitionName, useCompetitionData } from "./data";
 
 const wcif = {
   id: "InventedOpen2026",
@@ -43,5 +43,11 @@ describe("competition data", () => {
     expect(cacheAge(fetchedAt, Date.parse("2026-01-01T02:00:00.000Z"))).toBe(
       "2 hours old",
     );
+  });
+
+  it("names a stored competition from the cached WCIF, falling back to its id", () => {
+    expect(storedCompetitionName(wcif.id)).toBe(wcif.id);
+    writeJson(storageKeys.wcif(wcif.id), { wcif, fetchedAt: "2026-01-01T00:00:00.000Z" });
+    expect(storedCompetitionName(wcif.id)).toBe("Invented Open 2026");
   });
 });

@@ -28,6 +28,7 @@ import {
 } from "../../lib/wcaLive";
 import { useAuthStore } from "../auth/store";
 import { useCalculatorStore } from "../calculator/store";
+import { storedCompetitionName } from "../competition/data";
 import { useTrackingStore } from "../competition/trackingStore";
 import { useSettingsStore, type ThemePreference } from "./store";
 
@@ -139,7 +140,9 @@ export function SettingsScreen() {
                     sx={{ alignItems: { sm: "center" }, justifyContent: "space-between" }}
                   >
                     <Box>
-                      <Typography sx={{ fontWeight: 700 }}>{competitionId}</Typography>
+                      <Typography sx={{ fontWeight: 700 }}>
+                        {storedCompetitionName(competitionId)}
+                      </Typography>
                       <Typography color="text.secondary" variant="body2">
                         <LockOutlined aria-hidden="true" fontSize="inherit" /> {token
                           ? maskScoretakingToken(token.token)
@@ -174,7 +177,7 @@ export function SettingsScreen() {
                 <Storage aria-hidden="true" fontSize="inherit" /> {items.length} item
                 {items.length === 1 ? "" : "s"} in this browser
                 {competitionIds.length > 0
-                  ? ` · competitions: ${competitionIds.join(", ")}`
+                  ? ` · competitions: ${competitionIds.map(storedCompetitionName).join(", ")}`
                   : ""}
               </Typography>
             </Box>

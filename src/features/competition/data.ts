@@ -55,6 +55,15 @@ export function rememberCompetition(wcif: Competition): void {
   ].slice(0, 8));
 }
 
+/** A competition's name from what this browser already stores; the id when nothing does. */
+export function storedCompetitionName(competitionId: string): string {
+  return (
+    readRecentCompetitions().find(({ id }) => id === competitionId)?.name ??
+    readJson(storageKeys.wcif(competitionId), isCachedWcif)?.wcif.name ??
+    competitionId
+  );
+}
+
 export function useCompetitionData(competitionId: string) {
   return useQuery({
     queryKey: ["wcif", competitionId],
