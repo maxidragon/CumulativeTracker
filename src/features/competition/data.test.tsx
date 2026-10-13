@@ -1,4 +1,4 @@
-import type { Competition } from "@wca/helpers";
+import type { Competition } from "../../lib/wca";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook, waitFor } from "@testing-library/react";
 import type { PropsWithChildren } from "react";
@@ -7,6 +7,7 @@ import { storageKeys, writeJson } from "../../lib/storage";
 import { cacheAge, storedCompetitionName, useCompetitionData } from "./data";
 
 const wcif = {
+  formatVersion: "2.2",
   id: "InventedOpen2026",
   name: "Invented Open 2026",
   events: [],
@@ -33,6 +34,21 @@ describe("competition data", () => {
     const { result } = renderHook(() => useCompetitionData(wcif.id), { wrapper });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(result.current.data).toMatchObject({ wcif, fromCache: true });
+  });
+
+  it("does not fall back to a WCIF v1 cache", async () => {
+    writeJson(storageKeys.wcif(wcif.id), {
+      wcif: { ...wcif, formatVersion: "1.1" },
+      fetchedAt: "2026-01-01T00:00:00.000Z",
+    });
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("offline")));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = ({ children }: PropsWithChildren) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    );
+
+    const { result } = renderHook(() => useCompetitionData(wcif.id), { wrapper });
+    await waitFor(() => expect(result.current.isError).toBe(true));
   });
 
   it("formats cache age for people rather than machines", () => {

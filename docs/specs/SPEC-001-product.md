@@ -46,7 +46,7 @@ Nothing is saved: the numbers are scratch work, kept in memory and gone on reloa
 ### 2. Competition, local — no login required
 
 Enter a competition id, the app loads the **public WCIF** from the WCA
-(`GET /api/v0/competitions/{id}/wcif/public` — no auth, CORS open). From it the app knows the
+(`GET /api/v0/competitions/{id}/wcif/version/2` — no auth, CORS open). From it the app knows the
 events, the rounds, the formats, the cumulative groups and the registrant list. The user picks
 a cumulative group (or a single round) and gets a board of the competitors registered for it.
 

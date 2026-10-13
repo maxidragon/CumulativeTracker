@@ -1,4 +1,4 @@
-import type { Competition } from "@wca/helpers";
+import type { Competition } from "../../lib/wca";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -9,7 +9,13 @@ import { useTrackingStore } from "./trackingStore";
 import { useAuthStore } from "../auth/store";
 import { forgetScoretakingToken, saveScoretakingToken } from "../../lib/wcaLive";
 
+const fromRegistrations = {
+  participationSource: { type: "registrations" },
+  reservedPlaces: null,
+};
+
 const wcif = {
+  formatVersion: "2.2",
   id: "InventedOpen2026",
   name: "Invented Open 2026",
   persons: [
@@ -33,10 +39,11 @@ const wcif = {
       rounds: [
         {
           id: "333bf-r1",
+          linkedRounds: null,
           format: "3",
           timeLimit: { centiseconds: 120_000, cumulativeRoundIds: ["333bf-r1"] },
           cutoff: null,
-          advancementCondition: null,
+          participationRuleset: fromRegistrations,
           results: [],
           extensions: [],
         },
@@ -48,10 +55,11 @@ const wcif = {
 
 const sharedLimitRound = (id: string) => ({
   id,
+  linkedRounds: null,
   format: "3",
   timeLimit: { centiseconds: 360_000, cumulativeRoundIds: ["444bf-r1", "555bf-r1"] },
   cutoff: null,
-  advancementCondition: null,
+  participationRuleset: fromRegistrations,
   results: [],
   extensions: [],
 });

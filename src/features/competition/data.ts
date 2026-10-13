@@ -1,4 +1,4 @@
-import type { Competition } from "@wca/helpers";
+import type { Competition } from "../../lib/wca";
 import { useQuery } from "@tanstack/react-query";
 import { readJson, storageKeys, writeJson } from "../../lib/storage";
 import { fetchPublicWcif, isCompetition } from "../../lib/wca";

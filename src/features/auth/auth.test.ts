@@ -1,4 +1,4 @@
-import type { Competition } from "@wca/helpers";
+import type { Competition } from "../../lib/wca";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { storageKeys } from "../../lib/storage";
 import {

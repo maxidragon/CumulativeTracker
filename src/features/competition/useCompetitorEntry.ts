@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import type { Person } from "@wca/helpers";
+import type { Competitor } from "../../lib/wca";
 import { officialResult, type TrackedAttempt } from "../../lib/attempt";
 import {
   attemptsLeft,
@@ -53,7 +53,7 @@ function sameAttempt(left: TrackedAttempt, right: TrackedAttempt): boolean {
 export function useCompetitorEntry(
   competitionId: string,
   group: CompetitionGroup,
-  person: Person,
+  person: Competitor,
   liveToken: ScoretakingToken | null,
 ) {
   const updateAttempt = useTrackingStore((state) => state.updateAttempt);

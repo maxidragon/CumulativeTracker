@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import type { Competition, Person } from "@wca/helpers";
+import type { Competition, Person } from "../../lib/wca";
 import { parseCompetitionSummaries, type CompetitionSummary } from "../../lib/wca";
 import type { AuthSession } from "./model";
 import { useAuthStore } from "./store";

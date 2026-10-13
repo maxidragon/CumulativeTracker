@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { fetchPublicWcif, searchCompetitions, WcaApiError } from "./client";
+import { fetchPublicWcif, isCompetition, searchCompetitions, WcaApiError } from "./client";
 
 const minimalWcif = {
+  formatVersion: "2.2",
   id: "InventedOpen2026",
   name: "Invented Open 2026",
   events: [],
@@ -11,7 +12,7 @@ const minimalWcif = {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("WCA client", () => {
-  it("loads the public WCIF without credentials", async () => {
+  it("loads WCIF v2 without credentials", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify(minimalWcif), {
         status: 200,
@@ -22,7 +23,7 @@ describe("WCA client", () => {
 
     await expect(fetchPublicWcif("InventedOpen2026")).resolves.toMatchObject(minimalWcif);
     expect(fetchMock).toHaveBeenCalledWith(
-      "https://www.worldcubeassociation.org/api/v0/competitions/InventedOpen2026/wcif/public",
+      "https://www.worldcubeassociation.org/api/v0/competitions/InventedOpen2026/wcif/version/2",
       expect.objectContaining({ headers: { Accept: "application/json" } }),
     );
   });
@@ -47,6 +48,79 @@ describe("WCA client", () => {
     await expect(fetchPublicWcif("InventedOpen2026")).rejects.toThrow(
       /unexpected response/i,
     );
+  });
+
+  it("accepts the WCIF v2 additions: linked rounds, Head-to-Head and FTO", () => {
+    const round = (id: string, format: string, linkedRounds: string[] | null) => ({
+      id,
+      linkedRounds,
+      format,
+      timeLimit: { centiseconds: 60_000, cumulativeRoundIds: [] },
+      cutoff: { numberOfAttempts: 2, resultValue: 3_000 },
+    });
+    expect(
+      isCompetition({
+        ...minimalWcif,
+        events: [
+          {
+            id: "333",
+            rounds: [
+              round("333-r1", "a", ["333-r1", "333-r2"]),
+              round("333-r2", "a", ["333-r1", "333-r2"]),
+              round("333-r3", "h", null),
+            ],
+          },
+          { id: "fto", rounds: [round("fto-r1", "a", null)] },
+        ],
+        persons: [
+          {
+            registrantId: 1,
+            name: "Example Competitor",
+            countryIso2: "XA",
+            registration: { eventIds: ["333", "fto"], status: "accepted", isCompeting: true },
+          },
+        ],
+      }),
+    ).toBe(true);
+  });
+
+  it("accepts staff who did not register, whose registrantId is null", () => {
+    expect(
+      isCompetition({
+        ...minimalWcif,
+        persons: [
+          {
+            registrantId: null,
+            name: "Unregistered Organizer",
+            countryIso2: "XA",
+            registration: null,
+            roles: ["organizer"],
+          },
+        ],
+      }),
+    ).toBe(true);
+  });
+
+  it("rejects a WCIF v1 payload", () => {
+    expect(isCompetition({ ...minimalWcif, formatVersion: "1.1" })).toBe(false);
+    expect(
+      isCompetition({
+        ...minimalWcif,
+        events: [
+          {
+            id: "333",
+            rounds: [
+              {
+                id: "333-r1",
+                format: "a",
+                timeLimit: null,
+                cutoff: { numberOfAttempts: 2, attemptResult: 3_000 },
+              },
+            ],
+          },
+        ],
+      }),
+    ).toBe(false);
   });
 
   it("searches competitions by name, newest first", async () => {

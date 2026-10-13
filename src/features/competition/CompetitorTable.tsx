@@ -12,7 +12,7 @@ import {
   TableRow,
   Typography,
 } from "@mui/material";
-import type { Person } from "@wca/helpers";
+import type { Competitor } from "../../lib/wca";
 import { Link, useNavigate } from "react-router-dom";
 import { formatTime } from "../../lib/attempt";
 import { attemptsForFormat, type Budget, type BudgetSummary } from "../../lib/cumulative";
@@ -21,7 +21,7 @@ import { EventIcon } from "../../components/EventIcon";
 import { budgetSyncLabel, countryFlag, formatAttemptResult } from "./viewModel";
 
 export type CompetitorRow = {
-  person: Person;
+  person: Competitor;
   budget: Budget;
   summary: BudgetSummary;
 };

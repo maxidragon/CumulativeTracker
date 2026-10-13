@@ -10,7 +10,7 @@
 | Remote data | TanStack Query | Caching, refetch on focus, polling, request de-duplication — all needed for the WCA Live results poll |
 | Local state | Zustand with a persisting middleware | The tracker state is small, synchronous and must survive a reload; Redux would be ceremony |
 | Event icons | `@cubing/icons` | The standard set |
-| WCIF types | `@wca/helpers` | Official types for the WCIF payload; formatting stays ours |
+| WCIF types | Our own, in `lib/wca/types.ts` | `@wca/helpers` still describes WCIF v1; we type only the v2 fields we read |
 | Tests | Vitest + Testing Library | Same toolchain as the build |
 
 Versions are pinned at install time; this spec does not restate them.

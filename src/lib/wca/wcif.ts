@@ -1,6 +1,12 @@
-import type { Competition, EventId, Person, Round } from "@wca/helpers";
 import type { TrackedAttempt } from "../attempt";
-import { attemptsForFormat, groupKey, type Budget, type RoundPlan } from "../cumulative";
+import {
+  attemptsForFormat,
+  groupKey,
+  type Budget,
+  type RoundFormat,
+  type RoundPlan,
+} from "../cumulative";
+import type { Competition, Competitor, EventId, Round } from "./types";
 
 const UNSUPPORTED_EVENT_IDS = new Set<EventId>(["333fm", "333mbf", "333mbo"]);
 const EVENT_NAMES: Record<EventId, string> = {
@@ -21,6 +27,7 @@ const EVENT_NAMES: Record<EventId, string> = {
   "444bf": "4x4x4 Blindfolded",
   "555bf": "5x5x5 Blindfolded",
   "333mbf": "3x3x3 Multi-Blind",
+  fto: "Face-Turning Octahedron",
   magic: "Magic",
   mmagic: "Master Magic",
   "333mbo": "3x3x3 Multi-Blind (old style)",
@@ -57,6 +64,18 @@ export type CompetitionRound = RoundPlan & {
   roundLabel: string;
 };
 
+export type UnsupportedRound = {
+  roundId: string;
+  eventId: EventId;
+};
+
+/** A round the tracker can budget: a timed event and a fixed number of attempts. */
+type SupportedRound = Round & { format: RoundFormat };
+
+function isSupportedRound(eventId: EventId, round: Round): round is SupportedRound {
+  return !UNSUPPORTED_EVENT_IDS.has(eventId) && round.format !== "h";
+}
+
 export type CompetitionGroup = {
   key: string;
   limitCentiseconds: number;
@@ -76,7 +95,7 @@ function roundLabel(number: number, roundCount: number): string {
 
 function toCompetitionRound(
   eventId: EventId,
-  round: Round,
+  round: SupportedRound,
   roundCount: number,
 ): CompetitionRound {
   const number = roundNumber(round.id);
@@ -89,10 +108,10 @@ function toCompetitionRound(
     roundLabel: roundLabel(number, roundCount),
     format: round.format,
     cutoff:
-      round.cutoff && round.cutoff.attemptResult > 0
+      round.cutoff && round.cutoff.resultValue > 0
         ? {
             numberOfAttempts: round.cutoff.numberOfAttempts,
-            attemptResult: round.cutoff.attemptResult,
+            attemptResult: round.cutoff.resultValue,
           }
         : null,
     registered: true,
@@ -109,8 +128,8 @@ export function extractCompetitionGroups(wcif: Competition): CompetitionGroup[] 
 
   const groups = new Map<string, CompetitionGroup>();
   for (const event of wcif.events) {
-    if (UNSUPPORTED_EVENT_IDS.has(event.id)) continue;
     for (const round of event.rounds) {
+      if (!isSupportedRound(event.id, round)) continue;
       const timeLimit = round.timeLimit;
       if (!timeLimit || timeLimit.centiseconds <= 0) continue;
 
@@ -119,13 +138,12 @@ export function extractCompetitionGroups(wcif: Competition): CompetitionGroup[] 
       const key = groupKey(roundIds);
       if (groups.has(key)) continue;
 
-      const rounds = roundIds.flatMap((roundId) => {
-        const found = roundsById.get(roundId);
-        return found
-          ? [toCompetitionRound(found.eventId, found.round, found.roundCount)]
-          : [];
-      });
-      if (rounds.length === 0) continue;
+      const members = roundIds.flatMap((roundId) => roundsById.get(roundId) ?? []);
+      const rounds = members.flatMap(({ eventId, round, roundCount }) =>
+        isSupportedRound(eventId, round) ? [toCompetitionRound(eventId, round, roundCount)] : [],
+      );
+      // A shared limit cannot be budgeted when one of its rounds has no fixed attempt count.
+      if (rounds.length === 0 || rounds.length < members.length) continue;
 
       groups.set(key, {
         key,
@@ -139,22 +157,23 @@ export function extractCompetitionGroups(wcif: Competition): CompetitionGroup[] 
   return [...groups.values()].sort((left, right) => left.key.localeCompare(right.key));
 }
 
-export function unsupportedRounds(wcif: Competition): CompetitionRound[] {
+export function unsupportedRounds(wcif: Competition): UnsupportedRound[] {
   return wcif.events.flatMap((event) =>
-    UNSUPPORTED_EVENT_IDS.has(event.id)
-      ? event.rounds.map((round) => toCompetitionRound(event.id, round, event.rounds.length))
-      : [],
+    event.rounds
+      .filter((round) => !isSupportedRound(event.id, round))
+      .map((round) => ({ roundId: round.id, eventId: event.id })),
   );
 }
 
 export function competitorsForGroup(
   wcif: Competition,
   group: CompetitionGroup,
-): Person[] {
+): Competitor[] {
   const eventIds = new Set(group.rounds.map(({ eventId }) => eventId));
   return wcif.persons
     .filter(
-      (person) =>
+      (person): person is Competitor =>
+        person.registrantId !== null &&
         person.registration?.status === "accepted" &&
         person.registration.isCompeting &&
         person.registration.eventIds.some((eventId) => eventIds.has(eventId)),
@@ -163,7 +182,7 @@ export function competitorsForGroup(
 }
 
 export function plansForCompetitor(
-  person: Person,
+  person: Competitor,
   group: CompetitionGroup,
 ): RoundPlan[] {
   const registeredEvents = new Set(person.registration?.eventIds ?? []);
@@ -177,7 +196,7 @@ export function plansForCompetitor(
 }
 
 export function createCompetitionBudget(
-  person: Person,
+  person: Competitor,
   group: CompetitionGroup,
   perAttemptLimitCentiseconds: number | null = null,
 ): Budget {
