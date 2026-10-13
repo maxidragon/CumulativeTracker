@@ -22,12 +22,32 @@ scoretaking tokens, which is a liability we have no reason to take on.
 ### Public competition data — no auth
 
 ```
-GET https://www.worldcubeassociation.org/api/v0/competitions/{competitionId}/wcif/public
+GET https://www.worldcubeassociation.org/api/v0/competitions/{competitionId}/wcif/version/2
 ```
 
+[WCIF v2](https://github.com/thewca/wcif/blob/latest/specification.md), requested without a
+token, so it holds public data only. The major version is pinned: `/wcif/latest` will move to v3,
+and the unversioned v1 endpoints stop working on 2026-11-02. The app rejects a payload whose
+`formatVersion` is not `2.x`, including a v1 WCIF left in the local cache.
+
 Gives `events[].rounds[]` with `id`, `format`, `timeLimit { centiseconds, cumulativeRoundIds }`,
-`cutoff`, and `persons[]` with `name`, `wcaUserId`, `wcaId`, `registrantId`, `countryIso2`,
-`registration.eventIds`, `roles`. This is the whole basis of competition mode; no login needed.
+`cutoff { numberOfAttempts, resultValue }`, and `persons[]` with `name`, `wcaUserId`,
+`registrantId`, `countryIso2`, `registration.eventIds`, `roles`. This is the whole basis of
+competition mode; no login needed.
+
+What v2 changed, as it reaches this app:
+
+- `cutoff.attemptResult` is now `cutoff.resultValue`.
+- `format` may be `h` (Head-to-Head). Such a round has no fixed number of attempts, so it is
+  left out of the groups like FM and Multi-Blind, together with any limit it shares.
+- `fto` is a valid event id.
+- `linkedRounds` marks the rounds of a Dual Round (regulation 9v). Each round still carries
+  its own `timeLimit`, and every registered competitor may take part in both, so the groups
+  need nothing from it.
+- `advancementCondition` became `participationRuleset`, and attempts and personal bests
+  renamed `result`/`best` to `value`. The app reads none of these.
+
+The app never writes WCIF, so it has no `PATCH`.
 
 ```
 GET https://www.worldcubeassociation.org/api/v0/competitions/{competitionId}

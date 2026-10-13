@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import type { Person } from "@wca/helpers";
+import type { Person } from "../../lib/wca";
 import { officialResult, type TrackedAttempt } from "../../lib/attempt";
 import {
   attemptsLeft,

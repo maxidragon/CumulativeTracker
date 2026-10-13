@@ -7,7 +7,7 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-import type { Person } from "@wca/helpers";
+import type { Person } from "../../lib/wca";
 import { useEffect, useRef, useState } from "react";
 import { ConfirmActionDialog } from "../../components/ConfirmActionDialog";
 import { EventIcon } from "../../components/EventIcon";

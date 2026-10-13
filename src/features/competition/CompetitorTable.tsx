@@ -12,7 +12,7 @@ import {
   TableRow,
   Typography,
 } from "@mui/material";
-import type { Person } from "@wca/helpers";
+import type { Person } from "../../lib/wca";
 import { Link, useNavigate } from "react-router-dom";
 import { formatTime } from "../../lib/attempt";
 import { attemptsForFormat, type Budget, type BudgetSummary } from "../../lib/cumulative";

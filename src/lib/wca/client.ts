@@ -1,6 +1,8 @@
-import type { Competition } from "@wca/helpers";
+import type { Competition } from "./types";
 
 const DEFAULT_WCA_ORIGIN = "https://www.worldcubeassociation.org";
+/** Pinned: `latest` will move to v3, and v1 is gone after 2026-11-02. */
+const WCIF_MAJOR_VERSION = 2;
 const KNOWN_EVENT_IDS = new Set([
   "222",
   "333",
@@ -19,6 +21,7 @@ const KNOWN_EVENT_IDS = new Set([
   "444bf",
   "555bf",
   "333mbf",
+  "fto",
   "magic",
   "mmagic",
   "333mbo",
@@ -52,12 +55,16 @@ function isRound(value: unknown): boolean {
   return (
     isRecord(value) &&
     typeof value.id === "string" &&
-    ["1", "2", "3", "5", "a", "m"].includes(String(value.format)) &&
+    ["1", "2", "3", "5", "a", "m", "h"].includes(String(value.format)) &&
+    (value.linkedRounds === null ||
+      value.linkedRounds === undefined ||
+      (Array.isArray(value.linkedRounds) &&
+        value.linkedRounds.every((roundId) => typeof roundId === "string"))) &&
     (value.timeLimit === null || isTimeLimit(value.timeLimit)) &&
     (value.cutoff === null ||
       (isRecord(value.cutoff) &&
         Number.isInteger(value.cutoff.numberOfAttempts) &&
-        typeof value.cutoff.attemptResult === "number"))
+        typeof value.cutoff.resultValue === "number"))
   );
 }
 
@@ -97,6 +104,8 @@ function isPerson(value: unknown): boolean {
 export function isCompetition(value: unknown): value is Competition {
   return (
     isRecord(value) &&
+    typeof value.formatVersion === "string" &&
+    value.formatVersion.split(".")[0] === String(WCIF_MAJOR_VERSION) &&
     typeof value.id === "string" &&
     typeof value.name === "string" &&
     Array.isArray(value.events) &&
@@ -185,7 +194,7 @@ export async function fetchPublicWcif(
   signal?: AbortSignal,
 ): Promise<Competition> {
   const response = await fetch(
-    `${wcaOrigin()}/api/v0/competitions/${encodeURIComponent(competitionId)}/wcif/public`,
+    `${wcaOrigin()}/api/v0/competitions/${encodeURIComponent(competitionId)}/wcif/version/${WCIF_MAJOR_VERSION}`,
     { headers: { Accept: "application/json" }, signal },
   );
 
