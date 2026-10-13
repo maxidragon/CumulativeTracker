@@ -84,6 +84,23 @@ describe("WCA client", () => {
     ).toBe(true);
   });
 
+  it("accepts staff who did not register, whose registrantId is null", () => {
+    expect(
+      isCompetition({
+        ...minimalWcif,
+        persons: [
+          {
+            registrantId: null,
+            name: "Unregistered Organizer",
+            countryIso2: "XA",
+            registration: null,
+            roles: ["organizer"],
+          },
+        ],
+      }),
+    ).toBe(true);
+  });
+
   it("rejects a WCIF v1 payload", () => {
     expect(isCompetition({ ...minimalWcif, formatVersion: "1.1" })).toBe(false);
     expect(

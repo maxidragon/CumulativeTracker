@@ -44,6 +44,15 @@ const fixture = {
       },
       extensions: [],
     },
+    {
+      registrantId: null,
+      name: "Unregistered Organizer",
+      wcaUserId: 110,
+      countryIso2: "PL",
+      registration: null,
+      roles: ["organizer"],
+      extensions: [],
+    },
   ],
   events: [
     {
@@ -129,7 +138,7 @@ describe("WCIF cumulative groups", () => {
     expect(groups[0]?.rounds).toHaveLength(2);
   });
 
-  it("selects only accepted competitors registered for the group", () => {
+  it("selects only accepted competitors registered for the group, not unregistered staff", () => {
     const group = extractCompetitionGroups(fixture)[0];
     if (!group) throw new Error("Fixture group missing.");
     expect(competitorsForGroup(fixture, group).map(({ registrantId }) => registrantId)).toEqual([
@@ -139,11 +148,12 @@ describe("WCIF cumulative groups", () => {
 
   it("creates attempts only for rounds the competitor entered", () => {
     const group = extractCompetitionGroups(fixture)[0];
-    const person = fixture.persons[0];
-    if (!group || !person) throw new Error("Fixture data missing.");
+    if (!group) throw new Error("Fixture group missing.");
+    const [person] = competitorsForGroup(fixture, group);
+    if (!person) throw new Error("Fixture competitor missing.");
     const onlyThreeBlind = {
       ...person,
-      registration: { ...person.registration!, eventIds: ["333bf" as const] },
+      registration: { ...person.registration, eventIds: ["333bf" as const] },
     };
     const budget = createCompetitionBudget(onlyThreeBlind, group);
     expect(budget.attempts).toHaveLength(3);

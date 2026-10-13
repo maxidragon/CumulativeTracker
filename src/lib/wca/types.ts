@@ -62,13 +62,17 @@ export type Registration = {
 };
 
 export type Person = {
-  registrantId: number;
+  /** Null for staff who did not register, although the specification says Integer. */
+  registrantId: number | null;
   name: string;
   wcaUserId: number;
   countryIso2: string;
   roles?: string[];
   registration: Registration | null;
 };
+
+/** A person competing at the competition, so with a registration and a registrant id. */
+export type Competitor = Person & { registrantId: number; registration: Registration };
 
 export type Competition = {
   formatVersion: string;

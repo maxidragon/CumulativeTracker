@@ -7,7 +7,7 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-import type { Person } from "../../lib/wca";
+import type { Competitor } from "../../lib/wca";
 import { useEffect, useRef, useState } from "react";
 import { ConfirmActionDialog } from "../../components/ConfirmActionDialog";
 import { EventIcon } from "../../components/EventIcon";
@@ -23,7 +23,7 @@ import { attemptSyncLabel } from "./viewModel";
 type CompetitorPanelProps = {
   competitionId: string;
   group: CompetitionGroup;
-  person: Person;
+  person: Competitor;
   liveToken: ScoretakingToken | null;
   /** Bump to put the cursor on the next empty attempt again, e.g. for the same competitor. */
   focusRequest: number;

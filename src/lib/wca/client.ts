@@ -81,7 +81,7 @@ function isEvent(value: unknown): boolean {
 function isPerson(value: unknown): boolean {
   if (
     !isRecord(value) ||
-    !Number.isInteger(value.registrantId) ||
+    (value.registrantId !== null && !Number.isInteger(value.registrantId)) ||
     typeof value.name !== "string" ||
     typeof value.countryIso2 !== "string"
   ) {

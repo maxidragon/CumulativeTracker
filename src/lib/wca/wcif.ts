@@ -6,7 +6,7 @@ import {
   type RoundFormat,
   type RoundPlan,
 } from "../cumulative";
-import type { Competition, EventId, Person, Round } from "./types";
+import type { Competition, Competitor, EventId, Round } from "./types";
 
 const UNSUPPORTED_EVENT_IDS = new Set<EventId>(["333fm", "333mbf", "333mbo"]);
 const EVENT_NAMES: Record<EventId, string> = {
@@ -168,11 +168,12 @@ export function unsupportedRounds(wcif: Competition): UnsupportedRound[] {
 export function competitorsForGroup(
   wcif: Competition,
   group: CompetitionGroup,
-): Person[] {
+): Competitor[] {
   const eventIds = new Set(group.rounds.map(({ eventId }) => eventId));
   return wcif.persons
     .filter(
-      (person) =>
+      (person): person is Competitor =>
+        person.registrantId !== null &&
         person.registration?.status === "accepted" &&
         person.registration.isCompeting &&
         person.registration.eventIds.some((eventId) => eventIds.has(eventId)),
@@ -181,7 +182,7 @@ export function competitorsForGroup(
 }
 
 export function plansForCompetitor(
-  person: Person,
+  person: Competitor,
   group: CompetitionGroup,
 ): RoundPlan[] {
   const registeredEvents = new Set(person.registration?.eventIds ?? []);
@@ -195,7 +196,7 @@ export function plansForCompetitor(
 }
 
 export function createCompetitionBudget(
-  person: Person,
+  person: Competitor,
   group: CompetitionGroup,
   perAttemptLimitCentiseconds: number | null = null,
 ): Budget {
